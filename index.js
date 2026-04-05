@@ -1,9 +1,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
+const { Client, Collection, GatewayIntentBits, Partials, REST, Routes } = require('discord.js');
 require('dotenv').config();
 
-// Create a new client instance
 const client = new Client({
 	intents: [
 		GatewayIntentBits.Guilds,
@@ -12,7 +11,7 @@ const client = new Client({
 		GatewayIntentBits.MessageContent,
 		GatewayIntentBits.GuildMessageReactions,
 	],
-    partials: [Partials.Message, Partials.Channel, Partials.Reaction],
+	partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
 // Load commands
@@ -26,7 +25,7 @@ for (const file of commandFiles) {
 	if ('data' in command && 'execute' in command) {
 		client.commands.set(command.data.name, command);
 	} else {
-		console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+		console.log(`[WARNING] The command at ${filePath} is missing "data" or "execute".`);
 	}
 }
 
@@ -44,13 +43,38 @@ for (const file of eventFiles) {
 	}
 }
 
-// Initialize the Notion client (will be used by commands)
-const { Client: NotionClient } = require('@notionhq/client');
-client.notion = new NotionClient({ auth: process.env.NOTION_TOKEN });
+// Auto-register slash commands on startup
+client.once('ready', async () => {
+	try {
+		const rest = new REST().setToken(process.env.DISCORD_TOKEN);
+		const commands = [];
+		for (const [, command] of client.commands) {
+			commands.push(command.data.toJSON());
+		}
+
+		if (process.env.GUILD_ID) {
+			// Guild-scoped: instant registration
+			const data = await rest.put(
+				Routes.applicationGuildCommands(client.user.id, process.env.GUILD_ID),
+				{ body: commands },
+			);
+			console.log(`[COMMANDS] Registered ${data.length} guild commands.`);
+		} else {
+			// Global: takes ~1 hour to propagate
+			const data = await rest.put(
+				Routes.applicationCommands(client.user.id),
+				{ body: commands },
+			);
+			console.log(`[COMMANDS] Registered ${data.length} global commands.`);
+		}
+	} catch (error) {
+		console.error('[COMMANDS] Failed to register:', error);
+	}
+});
 
 // Initialize background jobs
 const staleCheck = require('./jobs/staleCheck');
 staleCheck(client);
 
-// Log in to Discord
+// Log in
 client.login(process.env.DISCORD_TOKEN);
