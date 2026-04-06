@@ -1,47 +1,34 @@
-const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('fork-request')
 		.setDescription('Request to start a new Bits&Bytes fork in your city.'),
 	async execute(interaction) {
-		const modal = new ModalBuilder()
-			.setCustomId('forkRequestForm')
-			.setTitle('Fork Request Form');
+		const embed = new EmbedBuilder()
+			.setTitle('💾 Initializing New Fork Request...')
+			.setDescription("ready to host your own node? click the button below to fill out the official **Bits&Bytes** fork registry form. let's build something epic! ⚡️")
+			.setColor('#3498DB')
+			.addFields(
+				{ name: 'Step 1', value: 'Click the "Open Form" button below.', inline: true },
+				{ name: 'Step 2', value: 'Complete the Notion form.', inline: true },
+				{ name: 'Step 3', value: 'Our team will reach out on Discord! 🛰️', inline: true }
+			)
+			.setFooter({ text: 'Bits&Bytes Protocol | Fork Registry', iconURL: interaction.guild.iconURL() })
+			.setTimestamp();
 
-		const nameInput = new TextInputBuilder()
-			.setCustomId('name')
-			.setLabel("What's your name?")
-			.setStyle(TextInputStyle.Short)
-            .setRequired(true);
+		const button = new ButtonBuilder()
+			.setLabel('Open Form ↗️')
+			.setURL('https://perfect-dinghy-781.notion.site/33a49ed2fc33800984e7c28ca3d7cd2a?pvs=105')
+			.setStyle(ButtonStyle.Link);
 
-		const cityInput = new TextInputBuilder()
-			.setCustomId('city')
-			.setLabel("Which city do you want to fork in?")
-			.setStyle(TextInputStyle.Short)
-            .setRequired(true);
+		const row = new ActionRowBuilder()
+			.addComponents(button);
 
-		const aboutInput = new TextInputBuilder()
-			.setCustomId('about')
-			.setLabel("Brief intro — who you are and what you want.")
-			.setStyle(TextInputStyle.Paragraph)
-            .setRequired(true);
-
-        const studentInput = new TextInputBuilder()
-            .setCustomId('student')
-            .setLabel("Are you a student? (Yes/No)")
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
-
-		// Add inputs to the modal
-		modal.addComponents(
-            new ActionRowBuilder().addComponents(nameInput),
-            new ActionRowBuilder().addComponents(cityInput),
-            new ActionRowBuilder().addComponents(aboutInput),
-            new ActionRowBuilder().addComponents(studentInput)
-        );
-
-		// Show the modal to the user
-		await interaction.showModal(modal);
+		await interaction.reply({
+			embeds: [embed],
+			components: [row],
+			ephemeral: true
+		});
 	},
 };

@@ -22,11 +22,7 @@ module.exports = {
 				}
 			}
 		} else if (interaction.isModalSubmit()) {
-			// Handle Modal Submissions (e.g., fork-request)
-			if (interaction.customId === 'forkRequestForm') {
-				const handleForkRequest = require('../lib/forkRequestHandler');
-				await handleForkRequest(interaction);
-			}
+			// Handle Modal Submissions if any (future use)
 		}
 	},
 };
