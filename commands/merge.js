@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, EmbedBuilder, MessageFlags } = require('discord.js');
 const notion = require('../lib/notion');
 
 module.exports = {
@@ -14,7 +14,7 @@ module.exports = {
 		const city = interaction.options.getString('city');
 		const guild = interaction.guild;
 
-		await interaction.deferReply({ ephemeral: true });
+		await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
 		try {
 			// 1. Assign @fork-lead role

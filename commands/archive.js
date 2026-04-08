@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, MessageFlags } = require('discord.js');
 const notion = require('../lib/notion');
 
 module.exports = {
@@ -14,7 +14,7 @@ module.exports = {
 		const reason = interaction.options.getString('reason');
 		const guild = interaction.guild;
 
-		await interaction.deferReply({ ephemeral: true });
+		await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
 		try {
 			// 1. Find the fork by city

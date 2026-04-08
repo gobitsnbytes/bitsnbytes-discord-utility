@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const notion = require('../lib/notion');
 
 module.exports = {
@@ -16,10 +16,10 @@ module.exports = {
         // Check if @fork-lead
         const member = await guild.members.fetch(interaction.user.id);
         if (!member.roles.cache.some(r => r.name === 'fork-lead')) {
-            return await interaction.reply({ content: "🚫 This command is only for @fork-lead users.", ephemeral: true });
+            return await interaction.reply({ content: "🚫 This command is only for @fork-lead users.", flags: [MessageFlags.Ephemeral] });
         }
 
-		await interaction.deferReply({ ephemeral: true });
+		await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
 		try {
 			// 1. Post to #pulse
