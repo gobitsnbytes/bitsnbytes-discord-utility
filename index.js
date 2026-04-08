@@ -87,9 +87,11 @@ client.once('ready', async () => {
 console.log('[BOOT] Initializing jobs...');
 try {
 	const staleCheck = require('./jobs/staleCheck');
+	const weeklyBrief = require('./jobs/weeklyBrief');
 	staleCheck(client);
+	weeklyBrief(client);
 } catch (err) {
-	console.error('[BOOT ERROR] Failed to initialize staleCheck:', err.message);
+	console.error('[BOOT ERROR] Failed to initialize jobs:', err.message);
 }
 
 // Log in

@@ -50,5 +50,6 @@ module.exports = {
 		archive: true,
 		merge: true,
 		'fork-request': true,
+		'view-forks': false,
 	}
 };
