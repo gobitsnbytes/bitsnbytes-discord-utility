@@ -12,8 +12,20 @@ module.exports = {
 		try {
 			const forks = await notion.getForks();
             
-            const active = forks.filter(f => f.properties?.Status?.select?.name === 'Active');
-            const pending = forks.filter(f => f.properties?.Status?.select?.name === 'Pending');
+            // Filter out "ghost" records (rows that have a status but no city or name data)
+            const isValidFork = (f) => {
+                const city = f.properties?.City?.rich_text?.[0]?.text?.content;
+                const name = f.properties?.Name?.title?.[0]?.text?.content;
+                return city || name; // Must have at least one identifying string
+            };
+
+            const active = forks
+                .filter(isValidFork)
+                .filter(f => f.properties?.Status?.select?.name === 'Active');
+            
+            const pending = forks
+                .filter(isValidFork)
+                .filter(f => f.properties?.Status?.select?.name === 'Pending');
 
 			const embed = new EmbedBuilder()
 				.setTitle('🍴 Active Bits&Bytes Forks')
@@ -21,14 +33,28 @@ module.exports = {
                 .setTimestamp();
 
             let activeList = active.map(f => {
-                const city = f.properties?.City?.rich_text?.[0]?.text?.content || 'Unknown';
+                const city = f.properties?.City?.rich_text?.[0]?.text?.content || 
+                             f.properties?.Name?.title?.[0]?.text?.content || 
+                             'Unknown';
+                
+                const leadName = f.properties?.["What's your name?"]?.rich_text?.[0]?.text?.content;
                 const leadId = f.properties?.['Discord ID']?.rich_text?.[0]?.text?.content;
-                return `bitsnbytes-${city.toLowerCase()}  →  ${leadId ? `<@${leadId}>` : 'unknown lead'}  (active)`;
+                
+                // Use Lead Name if Discord ID is missing
+                const leadDisplay = leadId ? `<@${leadId}>` : (leadName || 'unknown lead');
+                
+                return `bitsnbytes-${city.toLowerCase().replace(/\s+/g, '-')}  →  ${leadDisplay}  (active)`;
             }).join('\n');
 
             let pendingList = pending.map(f => {
-                const city = f.properties?.City?.rich_text?.[0]?.text?.content || 'Unknown';
-                return `bitsnbytes-${city.toLowerCase()}  →  pending`;
+                const city = f.properties?.City?.rich_text?.[0]?.text?.content || 
+                             f.properties?.Name?.title?.[0]?.text?.content || 
+                             'Pending';
+                
+                const leadName = f.properties?.["What's your name?"]?.rich_text?.[0]?.text?.content;
+                const leadDisplay = leadName ? `(${leadName})` : '';
+                
+                return `bitsnbytes-${city.toLowerCase().replace(/\s+/g, '-')}  →  pending ${leadDisplay}`;
             }).join('\n');
 
             if (activeList) embed.addFields({ name: 'Active', value: activeList });
