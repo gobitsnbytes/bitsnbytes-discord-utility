@@ -48,7 +48,7 @@ module.exports = {
 	// 📄 PROTOCOL BRANDING
 	BRANDING: {
 		footerText: 'BITS&BYTES // SECURE_PROTOCOL_V2.0.0',
-		documentationLabel: 'ACCESS_API_REFERENCE',
+		documentationLabel: 'Fork Handbook →',
 	},
 
 	// 🖥️ SYSTEM INTERFACE SETTINGS

@@ -19,22 +19,32 @@ module.exports = {
 		await interaction.deferReply({ flags });
 
 		try {
-			// 1. Assign @fork-lead role
+			// 1. Check for existing active fork
+			const existingFork = await notion.findForkByCity(city);
+			if (existingFork && existingFork.properties?.Status?.select?.name === 'Active') {
+				const flags = config.PRIVACY.merge ? [MessageFlags.Ephemeral] : [];
+				return await interaction.editReply({
+					content: `❌ An active fork for **${city}** already exists.`,
+					flags
+				});
+			}
+
+			// 2. Assign @fork-lead role
 			const forkLeadRole = guild.roles.cache.find(r => r.name === 'fork-lead');
 			if (!forkLeadRole) throw new Error('@fork-lead role not found in server.');
 			
 			const member = await guild.members.fetch(user.id);
 			await member.roles.add(forkLeadRole);
 
-			// 2. Update Notion
+			// 3. Update Notion
 			const fork = await notion.findForkByCity(city);
 			if (fork) {
 				await notion.updateForkStatus(fork.id, 'Active');
 			}
 
-			// 3. Create/Setup City Channel
+			// 4. Create/Setup City Channel
 			const category = guild.channels.cache.find(c => c.name === 'FORKS' && c.type === ChannelType.GuildCategory);
-			const channelName = `bitsnbytes-${city.toLowerCase().replace(/\s+/g, '-')}`;
+			const channelName = `gobitsnbytes-${city.toLowerCase().replace(/\s+/g, '-')}`;
 			
 			let channel = guild.channels.cache.find(c => c.name === channelName);
 			if (!channel) {

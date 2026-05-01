@@ -53,6 +53,7 @@ module.exports = {
 			await notion.createReport({
 				forkId: fork.id,
 				type: type,
+				city: city,
 				notes: notes,
 				attachmentUrl: attachmentUrl,
 				isLate: false, // Will be determined by job

@@ -79,6 +79,9 @@ module.exports = {
 					await notion.addTeamMember(forkId, discordId, role, memberName);
 				}
 
+				// Update team completeness score
+				await notion.computeAndUpdateTeamCompleteness(forkId);
+
 				// Get updated team for validation
 				const teamMembers = await notion.getTeamMembers(forkId);
 				const validation = teamValidator.validateTeam(teamMembers);
@@ -128,6 +131,9 @@ module.exports = {
 				}
 
 				await notion.removeTeamMember(existingMember.id);
+
+				// Update team completeness score
+				await notion.computeAndUpdateTeamCompleteness(forkId);
 
 				const embed = new EmbedBuilder()
 					.setTitle(`${config.EMOJIS.protocol} TEAM_UPDATE // ${city.toUpperCase()}`)
