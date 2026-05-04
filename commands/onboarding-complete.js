@@ -127,6 +127,9 @@ module.exports = {
 			await interaction.editReply({ embeds: [embed] });
 
 		} catch (error) {
+			// Don't re-throw if it's just a duplicate process acknowledgement
+			if (error.code === 40060) return;
+
 			// Let the global interaction handler log the error, but we'll provide a friendly response first
 			if (interaction.deferred || interaction.replied) {
 				await interaction.editReply({

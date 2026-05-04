@@ -21,7 +21,7 @@ module.exports = {
 				logger.command(interaction, 'SUCCESS');
 			} catch (error) {
 				// Don't log "Interaction has already been acknowledged" as a command error if it's just a duplicate process
-				if (error.code === 40060) {
+				if (error.code == 40060) {
 					logger.warn(`Interaction already acknowledged (likely duplicate process): ${interaction.commandName}`);
 					return;
 				}
