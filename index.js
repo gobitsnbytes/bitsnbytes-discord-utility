@@ -17,7 +17,7 @@ const client = new Client({
 });
 
 // Load commands
-logger.boot('Initializing command loading...');
+logger.boot('Initializing command loading...', null, false);
 client.commands = new Collection();
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
@@ -35,10 +35,10 @@ for (const file of commandFiles) {
 		logger.error(`Failed to load command ${file}`, err);
 	}
 }
-logger.boot(`Loaded ${client.commands.size} commands.`);
+logger.boot(`Loaded ${client.commands.size} commands.`, null, false);
 
 // Load events
-logger.boot('Initializing event loading...');
+logger.boot('Initializing event loading...', null, false);
 const eventsPath = path.join(__dirname, 'events');
 const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
@@ -55,7 +55,7 @@ for (const file of eventFiles) {
 		logger.error(`Failed to load event ${file}`, err);
 	}
 }
-logger.boot(`Events hooked.`);
+logger.boot('Events hooked.', null, false);
 
 // Auto-register slash commands on startup
 client.once('ready', async () => {
@@ -81,12 +81,17 @@ client.once('ready', async () => {
 			console.log(`[COMMANDS] Registered ${data.length} global commands.`);
 		}
 
-		// Log Git Info on Boot
+		// Log Deployment Receipt
 		const gitInfo = getGitInfo();
+		const stats = `✅ Commands: ${client.commands.size} Loaded\n✅ Events: Hooked\n✅ Jobs: Active`;
+		
 		if (gitInfo.available) {
-			logger.boot(`System Restarted // Commit: ${gitInfo.hash}`, `Title: ${gitInfo.title}\nBy: ${gitInfo.author}`);
+			logger.boot(
+				`SYSTEM // PROTOCOL_ONLINE`,
+				`**VERSION INFO**\n\`${gitInfo.hash}\` — *${gitInfo.title}*\n👤 **By:** ${gitInfo.author}\n\n**SYSTEM STATUS**\n${stats}`
+			);
 		} else {
-			logger.boot('System Restarted // Version info unavailable');
+			logger.boot(`SYSTEM // PROTOCOL_ONLINE`, `**SYSTEM STATUS**\n${stats}`);
 		}
 	} catch (error) {
 		logger.error('Failed to register slash commands', error);
@@ -97,7 +102,7 @@ client.once('ready', async () => {
 logger.init(client);
 
 // Initialize background jobs with isolated error handling
-logger.boot('Initializing jobs...');
+logger.boot('Initializing jobs...', null, false);
 
 /**
  * Safely start a job module - prevents one broken job from aborting all others
@@ -109,7 +114,7 @@ function safeStartJob(jobPath, client, jobName) {
 	try {
 		const job = require(jobPath);
 		job(client);
-		logger.boot(`${jobName} initialized successfully.`);
+		logger.boot(`${jobName} initialized successfully.`, null, false);
 	} catch (err) {
 		logger.error(`Failed to initialize ${jobName}`, err);
 	}
@@ -130,7 +135,7 @@ safeStartJob('./jobs/reportLateUpdater', client, 'reportLateUpdater');
 console.log('[BOOT] Job initialization complete.');
 
 // Log in
-logger.boot('Attempting login...');
+logger.boot('Attempting login...', null, false);
 client.login(process.env.DISCORD_TOKEN).catch(err => {
 	logger.error('Login failed', err);
 	process.exit(1);
