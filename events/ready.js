@@ -1,19 +1,20 @@
 const { Events, EmbedBuilder } = require('discord.js');
+const logger = require('../lib/logger');
 
 module.exports = {
 	name: Events.ClientReady,
 	once: true,
 	async execute(client) {
-		console.log(`[READY] Logged in as ${client.user.tag}`);
+		logger.boot(`Logged in as ${client.user.tag}`);
 
 		const rolesChannel = client.channels.cache.find(c => c.name === 'roles');
 		if (rolesChannel) {
-			console.log(`[ROLES] Found #roles channel (${rolesChannel.id}). Starting setup...`);
+			logger.info(`Found #roles channel (${rolesChannel.id}). Starting setup...`);
 			try {
 				// Delete old bot messages concurrently
 				const messages = await rolesChannel.messages.fetch({ limit: 20 });
 				const botMessages = messages.filter(m => m.author.id === client.user.id);
-				console.log(`[ROLES] Found ${botMessages.size} old messages to purge.`);
+				logger.info(`Found ${botMessages.size} old messages to purge in #roles.`);
 				await Promise.all(botMessages.map(msg => msg.delete().catch(() => {})));
 
 				const embed = new EmbedBuilder()
@@ -27,15 +28,15 @@ module.exports = {
 				const sent = await rolesChannel.send({ embeds: [embed] });
 				const emojis = ['💻', '🎨', '🔬', '⚙️'];
 				
-				console.log('[ROLES] Posting reactions...');
+				logger.info('Posting reactions to #roles...');
 				// React concurrently
 				await Promise.all(emojis.map(emoji => sent.react(emoji).catch(() => {})));
-				console.log('[ROLES] Channel setup successful.');
+				logger.info('Channel setup successful.');
 			} catch (err) {
-				console.error('[ROLES ERROR] Setup failed:', err.message);
+				logger.error('Roles setup failed', err);
 			}
 		} else {
-			console.log('[ROLES WARNING] #roles channel not found.');
+			logger.warn('#roles channel not found.');
 		}
 	},
 };

@@ -1,5 +1,6 @@
 const { Events, MessageFlags, EmbedBuilder } = require('discord.js');
 const config = require('../config');
+const logger = require('../lib/logger');
 
 module.exports = {
 	name: Events.InteractionCreate,
@@ -8,14 +9,15 @@ module.exports = {
 			const command = interaction.client.commands.get(interaction.commandName);
 
 			if (!command) {
-				console.error(`No command matching ${interaction.commandName} was found.`);
+				logger.error(`No command matching ${interaction.commandName} was found.`);
 				return;
 			}
 
 			try {
+				logger.command(interaction, 'EXECUTE');
 				await command.execute(interaction);
 			} catch (error) {
-				console.error(`[COMMAND ERROR] /${interaction.commandName}:`, error);
+				logger.command(interaction, 'ERROR', error);
 				
 				const errorEmbed = new EmbedBuilder()
 					.setTitle(`${config.EMOJIS.error} Protocol Breach`)
@@ -30,7 +32,7 @@ module.exports = {
 						await interaction.reply({ embeds: [errorEmbed], flags: [MessageFlags.Ephemeral] });
 					}
 				} catch (innerError) {
-					console.error('[ERROR HANDLER FAIL] Could not send error reply:', innerError.message);
+					logger.error('Could not send error reply', innerError);
 				}
 			}
 		} else if (interaction.isModalSubmit()) {

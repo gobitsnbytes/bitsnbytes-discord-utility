@@ -2,11 +2,12 @@ const cron = require('node-cron');
 const { EmbedBuilder } = require('discord.js');
 const notion = require('../lib/notion');
 const config = require('../config');
+const logger = require('../lib/logger');
 
 module.exports = (client) => {
 	// Run every Monday at 09:00 (0 9 * * 1)
 	cron.schedule('0 9 * * 1', async () => {
-		console.log('[JOB] Initializing Weekly Network Intelligence Brief...');
+		logger.info('Initializing Weekly Network Intelligence Brief...');
 		
 		try {
 			const forks = await notion.getForks();
@@ -14,7 +15,7 @@ module.exports = (client) => {
 			const channel = await client.channels.fetch(teamChatId);
 			
 			if (!channel) {
-				console.error(`[BRIEF ERROR] Target channel ${teamChatId} not found.`);
+				logger.error(`Weekly brief target channel ${teamChatId} not found.`);
 				return;
 			}
 
@@ -42,9 +43,9 @@ module.exports = (client) => {
 				.setFooter({ text: config.BRANDING.footerText });
 
 			await channel.send({ embeds: [briefEmbed] });
-			console.log('[JOB] Weekly brief delivered to #team-chat.');
+			logger.info('Weekly brief delivered successfully.');
 		} catch (error) {
-			console.error('[BRIEF JOB ERROR]', error);
+			logger.error('Weekly brief job failure', error);
 		}
 	});
 };

@@ -1,10 +1,11 @@
 const cron = require('node-cron');
 const notion = require('../lib/notion');
+const logger = require('../lib/logger');
 
 module.exports = (client) => {
 	// Run every Sunday at midnight (0 0 * * 0) - or as per PRD "every 7 days"
 	cron.schedule('0 0 * * 0', async () => {
-		console.log('[JOB] Running Stale Fork Detector...');
+		logger.info('Running Stale Fork Detector job...');
 		const forks = await notion.getForks();
 		const guild = client.guilds.cache.first(); // Assumes the bot is only in one guild
 		if (!guild) return;
