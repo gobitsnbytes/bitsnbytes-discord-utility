@@ -26,10 +26,13 @@ module.exports = {
 					.setFooter({ text: config.BRANDING.footerText });
 				
 				try {
+					// Check if the interaction is still valid/repliable
+					if (!interaction.isRepliable()) return;
+
 					if (interaction.replied || interaction.deferred) {
-						await interaction.followUp({ embeds: [errorEmbed], flags: [MessageFlags.Ephemeral] });
+						await interaction.followUp({ embeds: [errorEmbed], flags: [MessageFlags.Ephemeral] }).catch(() => null);
 					} else {
-						await interaction.reply({ embeds: [errorEmbed], flags: [MessageFlags.Ephemeral] });
+						await interaction.reply({ embeds: [errorEmbed], flags: [MessageFlags.Ephemeral] }).catch(() => null);
 					}
 				} catch (innerError) {
 					logger.error('Critical: Could not send error response to user', innerError);
