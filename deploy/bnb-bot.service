@@ -1,0 +1,15 @@
+[Unit]
+Description=Bits&Bytes Discord Bot
+After=network.target
+
+[Service]
+Type=simple
+User=bot
+WorkingDirectory=/opt/bits-bytes-bot
+EnvironmentFile=/opt/bits-bytes-bot/.env
+ExecStart=/usr/bin/node /opt/bits-bytes-bot/index.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

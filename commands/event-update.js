@@ -65,11 +65,12 @@ module.exports = {
 			}
 
 			// Update the event
-			await notion.updateEvent(eventId, {
-				status,
-				date,
-				attendees,
-			});
+			const update = {};
+			if (status) update.status = status;
+			if (date) update.date = date;
+			if (attendees !== null) update.attendees = attendees;
+
+			await notion.updateEvent(eventId, update);
 
 			const embed = new EmbedBuilder()
 				.setTitle(`${config.EMOJIS.protocol} EVENT_UPDATED`)

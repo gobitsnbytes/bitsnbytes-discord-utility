@@ -12,12 +12,42 @@ node deploy-commands.js   # Register slash commands (run once)
 node index.js             # Start the bot
 ```
 
-## Docker
+## Minimal VPS Deploy
+
+Best for a small VPS with low RAM:
+
+1. Install Node.js 20+ and git on the VPS.
+2. Clone this repo into a folder like `/opt/bits-bytes-bot`.
+3. Create the `.env` file in that folder.
+4. Install dependencies:
+	```bash
+	corepack enable
+	pnpm install --prod --frozen-lockfile
+	```
+5. Register commands once:
+	```bash
+	node deploy-commands.js
+	```
+6. Start the bot with systemd using the sample service file in [`deploy/bnb-bot.service`](deploy/bnb-bot.service).
+
+Useful restart command:
 
 ```bash
-docker build -t bnb-bot .
-docker run --env-file .env bnb-bot
+sudo systemctl restart bnb-bot
 ```
+
+## CI/CD
+
+This repo includes a GitHub Actions deploy workflow that SSHes into your VPS, pulls the latest code, reinstalls dependencies if needed, and restarts the systemd service.
+
+Set these GitHub secrets:
+
+| Secret | Meaning |
+|--------|---------|
+| `VPS_HOST` | Server IP or hostname |
+| `VPS_USER` | SSH username |
+| `VPS_SSH_KEY` | Private SSH key for the server |
+| `VPS_PATH` | Repo path on the VPS |
 
 ## Environment Variables
 

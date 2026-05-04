@@ -4,7 +4,7 @@ const config = require('../config');
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('help')
-		.setDescription('Access the B&B Protocol reference manual.'),
+		.setDescription('Show what each command does and who can use it.'),
 
 	async execute(interaction) {
 		const { commands } = interaction.client;
@@ -12,9 +12,23 @@ module.exports = {
 		const publicCmds = [];
 		const forkCmds = [];
 		const staffCmds = [];
+		const fields = [];
+
+		const formatUsage = (command) => {
+			const options = command.data.options?.map(option => (
+				option.required ? `<${option.name}>` : `[${option.name}]`
+			)).join(' ');
+			return options ? `\`/${command.data.name} ${options}\`` : `\`/${command.data.name}\``;
+		};
+
+		const getAudience = (commandName) => {
+			if (['merge', 'archive'].includes(commandName)) return 'Staff only';
+			if (['pulse', 'forks'].includes(commandName)) return 'Fork leads';
+			return 'Everyone';
+		};
 
 		commands.forEach(command => {
-			const entry = `\`/${command.data.name.toUpperCase()}\` :: ${command.data.description}`;
+			const entry = `${formatUsage(command)} — ${command.data.description} (${getAudience(command.data.name)})`;
 			if (['merge', 'archive'].includes(command.data.name)) {
 				staffCmds.push(entry);
 			} else if (['pulse', 'forks'].includes(command.data.name)) {
@@ -24,16 +38,42 @@ module.exports = {
 			}
 		});
 
+		const pushChunkedFields = (name, entries) => {
+			let current = '';
+			let part = 1;
+
+			for (const entry of entries) {
+				const next = current ? `${current}\n\n${entry}` : entry;
+				if (next.length > 1024) {
+					fields.push({
+						name: part === 1 ? name : `${name} (${part})`,
+						value: current,
+					});
+					current = entry;
+					part += 1;
+				} else {
+					current = next;
+				}
+			}
+
+			if (current) {
+				fields.push({
+					name: part === 1 ? name : `${name} (${part})`,
+					value: current,
+				});
+			}
+		};
+
+		pushChunkedFields('🌐 PUBLIC_INTERFACE', publicCmds);
+		pushChunkedFields('🛠️ NODE_OPERATIONS', forkCmds);
+		pushChunkedFields('🛡️ ROOT_ACCESS_ONLY', staffCmds);
+
 		const embed = new EmbedBuilder()
 			.setTitle(`${config.EMOJIS.help} BITS&BYTES_OS // CMD_REFERENCE_V${config.BRANDING.version || '2.0'}`)
-			.setDescription('Welcome to the **Bits&Bytes** core auxiliary system. Select a protocol to initialize:')
+			.setDescription('Use this to see what each command does, plus who it is meant for.')
 			.setColor(config.COLORS.primary)
             .setThumbnail(interaction.guild.iconURL())
-			.addFields(
-				{ name: '🌐 PUBLIC_INTERFACE', value: publicCmds.join('\n') || '*EMPTY*' },
-				{ name: '🛠️ NODE_OPERATIONS', value: forkCmds.join('\n') || '*EMPTY*' },
-				{ name: '🛡️ ROOT_ACCESS_ONLY', value: staffCmds.join('\n') || '*EMPTY*' }
-			)
+			.addFields(fields.length ? fields : [{ name: 'Commands', value: '*EMPTY*' }])
 			.setTimestamp()
             .setFooter({ text: config.BRANDING.footerText });
 

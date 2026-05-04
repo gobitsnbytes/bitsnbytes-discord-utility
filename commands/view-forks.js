@@ -47,8 +47,11 @@ module.exports = {
                 allowedMentions: { parse: [] } // SILENT_MENTIONS: Prevents annoying pings for Leads
             });
 		} catch (error) {
-			console.error('[NETWORK_VIEW_ERROR]', error);
-			await interaction.editReply({ content: `${config.EMOJIS.error} SYSTEM_FAILURE: Unable to synchronize network map.` });
+            console.error('[NETWORK_VIEW_ERROR]', error);
+            if (error.message && error.message.includes('NOTION_FORK_REGISTRY_DB not configured')) {
+                return await interaction.editReply({ content: `${config.EMOJIS.error} Configuration error: Notion Fork Registry DB not configured. Please set NOTION_FORK_REGISTRY_DB in the environment.` });
+            }
+            await interaction.editReply({ content: `${config.EMOJIS.error} SYSTEM_FAILURE: Unable to synchronize network map.` });
 		}
 	},
 };
