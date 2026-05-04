@@ -127,10 +127,13 @@ module.exports = {
 			await interaction.editReply({ embeds: [embed] });
 
 		} catch (error) {
-			logger.command(interaction, 'ERROR', error);
-			await interaction.editReply({
-				content: `${config.EMOJIS.error} SYSTEM_FAILURE: Unable to update onboarding step.`,
-			});
+			// Let the global interaction handler log the error, but we'll provide a friendly response first
+			if (interaction.deferred || interaction.replied) {
+				await interaction.editReply({
+					content: `${config.EMOJIS.error} SYSTEM_FAILURE: ${error.message || 'Unable to update onboarding step.'}`,
+				}).catch(() => {});
+			}
+			throw error;
 		}
 	},
 };
