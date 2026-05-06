@@ -2,6 +2,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection, GatewayIntentBits, Partials, REST, Routes } = require('discord.js');
 require('dotenv').config();
+const logger = require('./lib/logger');
+const { getGitInfo } = require('./lib/git');
 
 const client = new Client({
 	intents: [
@@ -15,7 +17,7 @@ const client = new Client({
 });
 
 // Load commands
-console.log('[BOOT] Initializing command loading...');
+logger.boot('Initializing command loading...', null, false);
 client.commands = new Collection();
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
@@ -27,16 +29,16 @@ for (const file of commandFiles) {
 		if ('data' in command && 'execute' in command) {
 			client.commands.set(command.data.name, command);
 		} else {
-			console.log(`[WARNING] The command at ${filePath} is missing "data" or "execute".`);
+			logger.warn(`The command at ${filePath} is missing "data" or "execute".`);
 		}
 	} catch (err) {
-		console.error(`[BOOT ERROR] Failed to load command ${file}:`, err.message);
+		logger.error(`Failed to load command ${file}`, err);
 	}
 }
-console.log(`[BOOT] Loaded ${client.commands.size} commands.`);
+logger.boot(`Loaded ${client.commands.size} commands.`, null, false);
 
 // Load events
-console.log('[BOOT] Initializing event loading...');
+logger.boot('Initializing event loading...', null, false);
 const eventsPath = path.join(__dirname, 'events');
 const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
@@ -50,10 +52,10 @@ for (const file of eventFiles) {
 			client.on(event.name, (...args) => event.execute(...args));
 		}
 	} catch (err) {
-		console.error(`[BOOT ERROR] Failed to load event ${file}:`, err.message);
+		logger.error(`Failed to load event ${file}`, err);
 	}
 }
-console.log(`[BOOT] Events hooked.`);
+logger.boot('Events hooked.', null, false);
 
 // Auto-register slash commands on startup
 client.once('ready', async () => {
@@ -78,13 +80,29 @@ client.once('ready', async () => {
 			);
 			console.log(`[COMMANDS] Registered ${data.length} global commands.`);
 		}
+
+		// Log Deployment Receipt
+		const gitInfo = getGitInfo();
+		const stats = `✅ Commands: ${client.commands.size} Loaded\n✅ Events: Hooked\n✅ Jobs: Active`;
+		
+		if (gitInfo.available) {
+			logger.boot(
+				`SYSTEM // PROTOCOL_ONLINE`,
+				`**VERSION INFO**\n\`${gitInfo.hash}\` — *${gitInfo.title}*\n👤 **By:** ${gitInfo.author}\n\n**SYSTEM STATUS**\n${stats}`
+			);
+		} else {
+			logger.boot(`SYSTEM // PROTOCOL_ONLINE`, `**SYSTEM STATUS**\n${stats}`);
+		}
 	} catch (error) {
-		console.error('[COMMANDS ERROR] Failed to register:', error);
+		logger.error('Failed to register slash commands', error);
 	}
 });
 
+// Initialize logger with client
+logger.init(client);
+
 // Initialize background jobs with isolated error handling
-console.log('[BOOT] Initializing jobs...');
+logger.boot('Initializing jobs...', null, false);
 
 /**
  * Safely start a job module - prevents one broken job from aborting all others
@@ -96,9 +114,9 @@ function safeStartJob(jobPath, client, jobName) {
 	try {
 		const job = require(jobPath);
 		job(client);
-		console.log(`[BOOT] ${jobName} initialized successfully.`);
+		logger.boot(`${jobName} initialized successfully.`, null, false);
 	} catch (err) {
-		console.error(`[BOOT ERROR] Failed to initialize ${jobName}:`, err.message);
+		logger.error(`Failed to initialize ${jobName}`, err);
 	}
 }
 
@@ -117,8 +135,8 @@ safeStartJob('./jobs/reportLateUpdater', client, 'reportLateUpdater');
 console.log('[BOOT] Job initialization complete.');
 
 // Log in
-console.log('[BOOT] Attempting login...');
+logger.boot('Attempting login...', null, false);
 client.login(process.env.DISCORD_TOKEN).catch(err => {
-	console.error('[BOOT ERROR] Login failed:', err.message);
+	logger.error('Login failed', err);
 	process.exit(1);
 });
