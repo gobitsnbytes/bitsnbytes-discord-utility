@@ -2,7 +2,6 @@ const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js'
 const notion = require('../lib/notion');
 const onboarding = require('../lib/onboarding');
 const config = require('../config');
-const logger = require('../lib/logger');
 
 // Staff role ID for permission check
 const STAFF_ROLE_ID = '1490410540361580554';
@@ -10,19 +9,17 @@ const STAFF_ROLE_ID = '1490410540361580554';
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('onboarding-complete')
-		.setDescription('Staff command: Mark onboarding step complete')
+		.setDescription('Staff command: Mark onboarding step(s) complete')
 		.addStringOption(option =>
 			option
 				.setName('city')
 				.setDescription('Fork city')
 				.setRequired(true))
-		.addIntegerOption(option =>
+		.addStringOption(option =>
 			option
-				.setName('step')
-				.setDescription('Step number (1-7)')
-				.setRequired(true)
-				.setMinValue(1)
-				.setMaxValue(7)),
+				.setName('steps')
+				.setDescription('Steps to mark complete (e.g., "3" for single, "1-3" for range, "1,3,5" for multiple, "1-3,5-7" for combination)')
+				.setRequired(true)),
 
 	async execute(interaction) {
 		// Staff permission check
@@ -44,7 +41,22 @@ module.exports = {
 
 		try {
 			const city = interaction.options.getString('city');
-			const step = interaction.options.getInteger('step');
+			const stepsInput = interaction.options.getString('steps');
+
+			// Parse the steps input
+			const parseResult = onboarding.parseStepsInput(stepsInput);
+			if (parseResult.error) {
+				return await interaction.editReply({
+					content: `${config.EMOJIS.error} Invalid steps input: ${parseResult.error}`,
+				});
+			}
+
+			const stepsToComplete = parseResult.steps;
+			if (stepsToComplete.length === 0) {
+				return await interaction.editReply({
+					content: `${config.EMOJIS.error} No valid steps provided.`,
+				});
+			}
 
 			// Find the fork
 			const fork = await notion.findForkByCity(city);
@@ -54,20 +66,27 @@ module.exports = {
 				});
 			}
 
-			// Get step info
-			const stepInfo = onboarding.getStepInfo(step);
-			if (!stepInfo) {
-				return await interaction.editReply({
-					content: `${config.EMOJIS.error} Invalid step number: ${step}`,
-				});
-			}
-
 			// Get pre-update onboarding status to detect transition
 			const preStatus = await notion.getOnboardingStatus(fork.id);
 			const wasComplete = onboarding.isOnboardingComplete(preStatus);
 
-			// Update the onboarding step
-			await notion.updateOnboardingStep(fork.id, step, true);
+			// Track completed steps for response
+			const completedSteps = [];
+			const alreadyCompleteSteps = [];
+
+			// Update each onboarding step
+			for (const step of stepsToComplete) {
+				const stepInfo = onboarding.getStepInfo(step);
+				
+				// Check if step was already complete
+				const stepStatus = preStatus.steps.find(s => s.step === step);
+				if (stepStatus && stepStatus.completed) {
+					alreadyCompleteSteps.push({ step, label: stepInfo?.label || 'Unknown' });
+				} else {
+					await notion.updateOnboardingStep(fork.id, step, true);
+					completedSteps.push({ step, label: stepInfo?.label || 'Unknown' });
+				}
+			}
 
 			// Get updated status
 			const onboardingStatus = await notion.getOnboardingStatus(fork.id);
@@ -80,11 +99,25 @@ module.exports = {
 				.setTimestamp()
 				.setFooter({ text: config.BRANDING.footerText });
 
-			embed.addFields({
-				name: '✅ STEP_COMPLETED',
-				value: `**Step ${step}**: ${stepInfo.label}`,
-				inline: false,
-			});
+			// Show completed steps
+			if (completedSteps.length > 0) {
+				const stepsDisplay = completedSteps.map(s => `**Step ${s.step}**: ${s.label}`).join('\n');
+				embed.addFields({
+					name: `✅ STEPS_COMPLETED (${completedSteps.length})`,
+					value: stepsDisplay,
+					inline: false,
+				});
+			}
+
+			// Show already complete steps (if any)
+			if (alreadyCompleteSteps.length > 0) {
+				const alreadyDisplay = alreadyCompleteSteps.map(s => `Step ${s.step}: ${s.label}`).join(', ');
+				embed.addFields({
+					name: 'ℹ️ ALREADY_COMPLETE',
+					value: alreadyDisplay,
+					inline: false,
+				});
+			}
 
 			embed.addFields({
 				name: '📊 OVERALL_PROGRESS',
@@ -127,16 +160,10 @@ module.exports = {
 			await interaction.editReply({ embeds: [embed] });
 
 		} catch (error) {
-			// Don't re-throw if it's just a duplicate process acknowledgement
-			if (error.code === 40060) return;
-
-			// Let the global interaction handler log the error, but we'll provide a friendly response first
-			if (interaction.deferred || interaction.replied) {
-				await interaction.editReply({
-					content: `${config.EMOJIS.error} SYSTEM_FAILURE: ${error.message || 'Unable to update onboarding step.'}`,
-				}).catch(() => {});
-			}
-			throw error;
+			console.error('[ONBOARDING_COMPLETE_ERROR]', error);
+			await interaction.editReply({
+				content: `${config.EMOJIS.error} SYSTEM_FAILURE: Unable to update onboarding step(s).`,
+			});
 		}
 	},
 };

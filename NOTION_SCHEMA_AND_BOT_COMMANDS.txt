@@ -1,0 +1,139 @@
+# Bits&Bytes Bot - Notion Database Schema & Supported Commands
+
+## 1. Notion Database Structure Requirements
+
+The bot requires 5 Notion databases to function. Below is the complete schema for each, including the Fork Registry (matching the provided schema requirements) and additional databases for extended features.
+
+---
+
+### 1.1 Fork Registry Database (NOTION_FORK_REGISTRY_DB)
+Primary database for tracking all fork chapters. Matches the provided schema requirements with additional properties for bot functionality.
+
+| Property Name (Notion) | Proposed Name (Schema) | Notion Type | Nullable | Description |
+|------------------------|------------------------|------------|----------|-------------|
+| Page ID | id | (Auto-generated) | No | Internal Notion page ID (primary key) |
+| Name | fork_name | Title | No | Public-facing fork name (Bits&Bytes <City>) |
+| What city are you in? | city | Rich Text | Yes | City name as stated by applicant |
+| What's your name? | lead_name | Rich Text | No | Full name of fork lead |
+| What's your email? | lead_email | Rich Text | No | Email address of fork lead |
+| Student | Student | Select | Yes | Whether lead is a student (Yes/No) |
+| About | extra_info | Rich Text | Yes | Freeform extra context from lead |
+| Anything else you want us to know? | extra_info | Rich Text | Yes | Additional context (matches schema) |
+| If you got the green light tomorrow, what does day one look like? | day_one_plan | Rich Text | Yes | Day 1 plan after approval |
+| Last Pulse | last_pulse | Date | Yes | Last interaction timestamp (parsed to datetime) |
+| LinkedIn | linkedin_url | URL | Yes | Fork lead's LinkedIn profile URL |
+| Merge Date | merge_date | Date | Yes | When fork was merged/approved |
+| Notes | notes | Rich Text | Yes | Internal core team notes |
+| Phone | phone | Rich Text | Yes | Contact phone number |
+| Place | place | Rich Text | Yes | Freeform place/city string |
+| Status | status | Select | No | Lifecycle status (Active, Archived, Pending) |
+| Subdomain | subdomain | Rich Text | Yes | Fork website subdomain (e.g., prayagraj.gobitsnbytes.org) |
+| Tell us about something you just did — no one asked, you just did it. | initiative_example | Rich Text | Yes | Applicant's self-initiated project |
+| What's something that didn't go as planned — and what did you do next? | failure_story | Rich Text | Yes | Failure reflection |
+| What's the tech scene like where you're from? | local_tech_scene | Rich Text | Yes | Local tech ecosystem description |
+| Where do you go to school? | school | Rich Text | Yes | Lead's school/college |
+| Why do you want to bring Bits&Bytes to your city? | motivation | Rich Text | Yes | Lead's motivation statement |
+| Discord ID | Discord ID | Rich Text | Yes | Lead's Discord user ID |
+| Health Score | Health Score | Number | Yes | 0-100 fork health score |
+| Points | Points | Number | Yes | Total gamification points |
+| Monthly Points | Monthly Points | Number | Yes | Points earned in current month |
+| Events Count | Events Count | Number | Yes | Total events hosted by fork |
+| Partnerships Count | Partnerships Count | Number | Yes | Total partnerships secured |
+| Reports Submitted | Reports Submitted | Number | Yes | Total reports submitted |
+| Team Completeness | Team Completeness | Number | Yes | Team structure completeness score (0-20) |
+| Badges | Badges | Multi-Select | Yes | Earned badges (e.g., 🎯 First Steps, 🏆 Event Legend) |
+| Onboarding Step 1 | Onboarding Step 1 | Checkbox | Yes | Step 1 complete (GitHub joined) |
+| Onboarding Step 2 | Onboarding Step 2 | Checkbox | Yes | Step 2 complete (Fork channel created) |
+| Onboarding Step 3 | Onboarding Step 3 | Checkbox | Yes | Step 3 complete (Website deployed) |
+| Onboarding Step 4 | Onboarding Step 4 | Checkbox | Yes | Step 4 complete (Notion shared) |
+| Onboarding Step 5 | Onboarding Step 5 | Checkbox | Yes | Step 5 complete (First pulse) |
+| Onboarding Step 6 | Onboarding Step 6 | Checkbox | Yes | Step 6 complete (Team defined) |
+| Onboarding Step 7 | Onboarding Step 7 | Checkbox | Yes | Step 7 complete (First event planned) |
+
+---
+
+### 1.2 Team Members Database (NOTION_TEAM_DB)
+Tracks team members for each fork.
+
+| Property Name | Notion Type | Description |
+|--------------|------------|-------------|
+| Name | Title | Member name |
+| Fork | Relation (Fork Registry) | Linked fork chapter |
+| Discord ID | Rich Text | Member's Discord user ID |
+| Role | Select | Member role (tech-lead, creative-lead, ops-lead, volunteer, member) |
+| Joined Date | Date | Date member joined the team |
+
+---
+
+### 1.3 Events Database (NOTION_EVENTS_DB)
+Tracks events for all forks.
+
+| Property Name | Notion Type | Description |
+|--------------|------------|-------------|
+| Event Name | Title | Event title |
+| Fork | Relation (Fork Registry) | Linked fork chapter |
+| Date | Date | Event date |
+| Type | Select | Event type (workshop, hackathon, meetup, other) |
+| Status | Select | Event lifecycle (Idea, Planned, Approved, Executing, Completed, Cancelled) |
+| Description | Rich Text | Event details |
+| Expected Attendees | Number | Expected headcount |
+| Actual Attendees | Number | Actual headcount after event |
+| Created By | Rich Text | Discord ID of event creator |
+
+---
+
+### 1.4 Reports Database (NOTION_REPORTS_DB)
+Tracks fork report submissions.
+
+| Property Name | Notion Type | Description |
+|--------------|------------|-------------|
+| Report Title | Title | Auto-generated report title |
+| Fork | Relation (Fork Registry) | Linked fork chapter |
+| Type | Select | Report type (monthly, bi-weekly) |
+| Submitted Date | Date | Date report was submitted |
+| Attachment URL | URL | Link to PDF/report attachment |
+| Notes | Rich Text | Additional report notes |
+| Status | Select | Report status (on-time, late, missing) |
+
+---
+
+### 1.5 Reminders Database (NOTION_REMINDERS_DB)
+Tracks sent reminders to prevent spam.
+
+| Property Name | Notion Type | Description |
+|--------------|------------|-------------|
+| Fork | Relation (Fork Registry) | Linked fork chapter |
+| Reminder Type | Select | Reminder type (no-team, no-event, no-pulse, missing-roles, report-overdue, onboarding-incomplete) |
+| Last Sent | Date | Last time reminder was sent |
+| Is Active | Checkbox | Whether reminder is still active |
+
+---
+
+## 2. Supported Bot Commands
+
+All commands are Discord slash commands. Privacy setting: `true` = ephemeral (only visible to user), `false` = public (visible to channel).
+
+| Command | Description | Options | Privacy |
+|---------|-------------|---------|---------|
+| /fork-request | Submit a new fork request | `name` (required), `city` (required), `about` (optional), `student` (optional) | true |
+| /forks | List all forks | None | true |
+| /view-forks | View all fork chapters | None | false |
+| /merge | Approve/merge a fork (staff only) | `city` (required) | true |
+| /archive | Archive a fork (staff only) | `city` (required) | true |
+| /pulse | Submit a pulse update for your fork | `city` (required), `message` (optional) | true |
+| /help | Show bot help and command list | None | true |
+| /assets | View fork assets (staff only) | None | true |
+| /fork-health | View fork health leaderboard or specific fork health | `city` (optional), `period` (optional: week/month/all-time) | false |
+| /team-update | Add/remove team members | `city` (required), `member` (required), `role` (required), `action` (required: add/remove) | true |
+| /team-view | View fork team structure | `city` (optional) | false |
+| /fork-status | View complete fork status dashboard | `city` (required) | false |
+| /report-submit | Submit a fork report | `city` (required), `type` (required: monthly/bi-weekly), `attachment` (optional), `notes` (optional) | true |
+| /report-status | View report submission status | `city` (optional) | false |
+| /event-create | Create a new event proposal | `title` (required), `city` (required), `date` (required), `type` (required), `description` (required), `expected-attendees` (optional) | true |
+| /event-update | Update an existing event | `event-id` (required), `status` (optional), `date` (optional), `attendees` (optional) | true |
+| /event-status | View event pipeline | `city` (optional), `status` (optional) | false |
+| /event-calendar | View network-wide event calendar | None | false |
+| /onboarding-status | View onboarding progress | `city` (optional) | false |
+| /onboarding-complete | Mark onboarding step(s) complete (staff only) | `city` (required), `steps` (required: e.g., "3" for single, "1-3" for range, "1,3,5" for multiple, "1-3,5-7" for combination) | true |
+| /leaderboard | View fork points leaderboard | `period` (optional: month/all) | false |
+| /fork-badges | View fork badges/achievements | `city` (optional) | false |
