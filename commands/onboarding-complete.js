@@ -4,7 +4,7 @@ const onboarding = require('../lib/onboarding');
 const config = require('../config');
 
 // Staff role ID for permission check
-const STAFF_ROLE_ID = '1490410540361580554';
+const STAFF_ROLE_ID = '1480620981587279993';
 
 module.exports = {
 	data: new SlashCommandBuilder()

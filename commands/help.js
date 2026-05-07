@@ -22,14 +22,14 @@ module.exports = {
 		};
 
 		const getAudience = (commandName) => {
-			if (['merge', 'archive'].includes(commandName)) return 'Staff only';
+			if (['merge', 'archive', 'onboarding-complete'].includes(commandName)) return 'Staff only';
 			if (['pulse', 'forks'].includes(commandName)) return 'Fork leads';
 			return 'Everyone';
 		};
 
 		commands.forEach(command => {
 			const entry = `${formatUsage(command)} — ${command.data.description} (${getAudience(command.data.name)})`;
-			if (['merge', 'archive'].includes(command.data.name)) {
+			if (['merge', 'archive', 'onboarding-complete'].includes(command.data.name)) {
 				staffCmds.push(entry);
 			} else if (['pulse', 'forks'].includes(command.data.name)) {
 				forkCmds.push(entry);
