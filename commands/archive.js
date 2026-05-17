@@ -35,12 +35,16 @@ module.exports = {
                 }
             }
 
-			// 3. Rename and lock channel
-			const channelName = city.toLowerCase().replace(/\s+/g, '-');
-			const cityChannel = guild.channels.cache.find(c => c.name === channelName || c.name === `${channelName}-archived`);
+			// 3. Delete city channel
+			const baseChannelName = city.toLowerCase().replace(/\s+/g, '-');
+			const cityChannel = guild.channels.cache.find(c => 
+				c.name === baseChannelName || 
+				c.name === `gobitsnbytes-${baseChannelName}` ||
+				c.name === `${baseChannelName}-archived` ||
+				c.name === `gobitsnbytes-${baseChannelName}-archived`
+			);
 			if (cityChannel) {
-				await cityChannel.setName(`${channelName}-archived`);
-				await cityChannel.permissionOverwrites.edit(guild.roles.everyone, { SendMessages: false });
+				await cityChannel.delete(`Fork for ${city} archived/decommissioned.`);
 			}
 
 			// 4. Update Notion status

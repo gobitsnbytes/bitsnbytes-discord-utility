@@ -15,20 +15,21 @@ module.exports = {
 		const guild = interaction.guild;
 
 		const flags = config.PRIVACY.pulse ? [MessageFlags.Ephemeral] : [];
-
-        // Check if @fork-lead
-        const member = await guild.members.fetch(interaction.user.id);
-        const forkLeadRole = guild.roles.cache.find(r => r.name === 'fork-lead');
-        if (!forkLeadRole || !member.roles.cache.has(forkLeadRole.id)) {
-            return await interaction.reply({ 
-                content: `${config.EMOJIS.error} SYSTEM_ALERT: Command requires **@fork-lead** authorization level.`, 
-                flags
-            });
-        }
-
 		await interaction.deferReply({ flags });
 
 		try {
+			// Enforce authorization check for the city node
+			const auth = require('../lib/auth');
+			const isAuthorized = await auth.isAuthorizedForCity(interaction.user, city, guild);
+			if (!isAuthorized) {
+				const unauthorizedEmbed = new EmbedBuilder()
+					.setTitle(`${config.EMOJIS.error} PROTOCOL_UNAUTHORIZED`)
+					.setDescription(`Your credentials do not grant access to broadcast pulses for the **${city.toUpperCase()}** node.`)
+					.setColor(config.COLORS.error)
+					.setFooter({ text: config.BRANDING.footerText });
+				return await interaction.editReply({ embeds: [unauthorizedEmbed] });
+			}
+
 			// 1. Post to #pulse
 			const pulseChannel = guild.channels.cache.find(c => c.name === 'pulse');
 			if (pulseChannel) {

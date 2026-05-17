@@ -47,6 +47,26 @@ module.exports = {
 			const date = interaction.options.getString('date');
 			const attendees = interaction.options.getInteger('attendees');
 
+			// Get the event to find the forkId
+			const event = await notion.getEvents().then(events => events.find(e => e.id === eventId));
+			if (!event) {
+				return await interaction.editReply({
+					content: `${config.EMOJIS.error} Event not found for ID: ${eventId}`,
+				});
+			}
+
+			// Enforce authorization check using the event's forkId
+			const auth = require('../lib/auth');
+			const isAuthorized = await auth.isAuthorizedForForkId(interaction.user, event.forkId, interaction.guild);
+			if (!isAuthorized) {
+				const unauthorizedEmbed = new EmbedBuilder()
+					.setTitle(`${config.EMOJIS.error} PROTOCOL_UNAUTHORIZED`)
+					.setDescription('Your credentials do not grant access to update events for this city node.')
+					.setColor(config.COLORS.error)
+					.setFooter({ text: config.BRANDING.footerText });
+				return await interaction.editReply({ embeds: [unauthorizedEmbed] });
+			}
+
 			// Validate at least one update provided
 			if (!status && !date && attendees === null) {
 				return await interaction.editReply({
@@ -105,8 +125,6 @@ module.exports = {
 			// Points for completing event - actually award the points
 			if (status === 'Completed') {
 				try {
-					// Get the event to find the fork
-					const event = await notion.getEvents().then(events => events.find(e => e.id === eventId));
 					if (event && event.forkId) {
 						await notion.updateForkPoints(event.forkId, gamification.POINTS.EVENT_COMPLETED);
 						embed.addFields({

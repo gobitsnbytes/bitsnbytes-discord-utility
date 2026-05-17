@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js'
 const notion = require('../lib/notion');
 const teamValidator = require('../lib/teamValidator');
 const config = require('../config');
+const auth = require('../lib/auth');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -49,6 +50,17 @@ module.exports = {
 			const role = interaction.options.getString('role');
 			const action = interaction.options.getString('action');
 
+			// Enforce authorization check
+			const isAuthorized = await auth.isAuthorizedForCity(interaction.user, city, interaction.guild);
+			if (!isAuthorized) {
+				const unauthorizedEmbed = new EmbedBuilder()
+					.setTitle(`${config.EMOJIS.error} PROTOCOL_UNAUTHORIZED`)
+					.setDescription('Your credentials do not grant access to modify the team structure of this city node.')
+					.setColor(config.COLORS.error)
+					.setFooter({ text: config.BRANDING.footerText });
+				return await interaction.editReply({ embeds: [unauthorizedEmbed] });
+			}
+
 			// Find the fork
 			const fork = await notion.findForkByCity(city);
 			if (!fork) {
@@ -81,6 +93,16 @@ module.exports = {
 
 				// Update team completeness score
 				await notion.computeAndUpdateTeamCompleteness(forkId);
+
+				// Automatically grant channel access to the added member
+				const channelName = `gobitsnbytes-${city.toLowerCase().replace(/\s+/g, '-')}`;
+				const cityChannel = interaction.guild.channels.cache.find(c => c.name === channelName);
+				if (cityChannel) {
+					await cityChannel.permissionOverwrites.edit(discordId, {
+						ViewChannel: true,
+						SendMessages: true
+					});
+				}
 
 				// Get updated team for validation
 				const teamMembers = await notion.getTeamMembers(forkId);
@@ -134,6 +156,18 @@ module.exports = {
 
 				// Update team completeness score
 				await notion.computeAndUpdateTeamCompleteness(forkId);
+
+				// Automatically revoke channel access from the removed member if they have no other active roles in the team
+				const channelName = `gobitsnbytes-${city.toLowerCase().replace(/\s+/g, '-')}`;
+				const cityChannel = interaction.guild.channels.cache.find(c => c.name === channelName);
+				if (cityChannel) {
+					const remainingMembers = await notion.getTeamMembers(forkId);
+					const hasOtherRole = remainingMembers.some(m => m.discordId === discordId);
+					if (!hasOtherRole) {
+						// Remove their user-specific permission overwrite from the channel
+						await cityChannel.permissionOverwrites.delete(discordId);
+					}
+				}
 
 				const embed = new EmbedBuilder()
 					.setTitle(`${config.EMOJIS.protocol} TEAM_UPDATE // ${city.toUpperCase()}`)

@@ -57,6 +57,18 @@ module.exports = {
 			const description = interaction.options.getString('description') || '';
 			const expectedAttendees = interaction.options.getInteger('expected-attendees') || 0;
 
+			// Enforce authorization check
+			const auth = require('../lib/auth');
+			const isAuthorized = await auth.isAuthorizedForCity(interaction.user, city, interaction.guild);
+			if (!isAuthorized) {
+				const unauthorizedEmbed = new EmbedBuilder()
+					.setTitle(`${config.EMOJIS.error} PROTOCOL_UNAUTHORIZED`)
+					.setDescription(`Your credentials do not grant access to create event proposals for the **${city.toUpperCase()}** node.`)
+					.setColor(config.COLORS.error)
+					.setFooter({ text: config.BRANDING.footerText });
+				return await interaction.editReply({ embeds: [unauthorizedEmbed] });
+			}
+
 			// Validate date format
 			const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 			if (!dateRegex.test(dateStr)) {

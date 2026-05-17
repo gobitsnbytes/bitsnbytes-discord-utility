@@ -41,6 +41,18 @@ module.exports = {
 			const notes = interaction.options.getString('notes') || '';
 			const attachmentUrl = interaction.options.getString('attachment') || null;
 
+			// Enforce authorization check
+			const auth = require('../lib/auth');
+			const isAuthorized = await auth.isAuthorizedForCity(interaction.user, city, interaction.guild);
+			if (!isAuthorized) {
+				const unauthorizedEmbed = new EmbedBuilder()
+					.setTitle(`${config.EMOJIS.error} PROTOCOL_UNAUTHORIZED`)
+					.setDescription(`Your credentials do not grant access to submit reports for the **${city.toUpperCase()}** node.`)
+					.setColor(config.COLORS.error)
+					.setFooter({ text: config.BRANDING.footerText });
+				return await interaction.editReply({ embeds: [unauthorizedEmbed] });
+			}
+
 			// Find the fork
 			const fork = await notion.findForkByCity(city);
 			if (!fork) {

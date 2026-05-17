@@ -49,18 +49,32 @@ module.exports = {
 			const category = guild.channels.cache.find(c => c.name === 'FORKS' && c.type === ChannelType.GuildCategory);
 			const channelName = `gobitsnbytes-${city.toLowerCase().replace(/\s+/g, '-')}`;
 			
+			const overwrites = [
+				{ id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+				{ id: user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
+			];
+
+			// Include Staff role explicitly if it exists
+			const STAFF_ROLE_ID = '1480620981587279993';
+			const staffRole = guild.roles.cache.get(STAFF_ROLE_ID);
+			if (staffRole) {
+				overwrites.push({
+					id: staffRole.id,
+					allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages]
+				});
+			}
+
 			let channel = guild.channels.cache.find(c => c.name === channelName);
 			if (!channel) {
 				channel = await guild.channels.create({
-				name: channelName,
-				type: ChannelType.GuildText,
-				parent: category ? category.id : null,
-				permissionOverwrites: [
-					{ id: guild.roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
-					{ id: user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
-					{ id: forkLeadRole.id, allow: [PermissionFlagsBits.ViewChannel] }
-				]
+					name: channelName,
+					type: ChannelType.GuildText,
+					parent: category ? category.id : null,
+					permissionOverwrites: overwrites
 				});
+			} else {
+				// If channel already exists, update/set the isolated permission overwrites
+				await channel.permissionOverwrites.set(overwrites);
 			}
 
 			const successEmbed = new EmbedBuilder()
