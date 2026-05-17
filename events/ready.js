@@ -63,21 +63,67 @@ module.exports = {
 
 						logger.info(`[SYNC] Synchronizing permissions for #${channelName} in guild: ${guild.name}`);
 
+						const STAFF_ROLE_ID = '1480620981587279993';
+						const staffRole = guild.roles.cache.get(STAFF_ROLE_ID);
+
+						// 1. Fetch team members to compute desired state
+						let teamMembers = [];
+						try {
+							teamMembers = await notion.getTeamMembers(fork.id);
+						} catch (teamErr) {
+							logger.warn(`[SYNC] Could not fetch team members for fork ${city}: ${teamErr.message}`);
+						}
+
+						// 2. Compute the exact set of Discord IDs that should be in the channel
+						const desiredIds = new Set();
+						desiredIds.add(guild.roles.everyone.id);
+						if (staffRole) desiredIds.add(staffRole.id);
+						if (leadDiscordId) desiredIds.add(leadDiscordId);
+						for (const member of teamMembers) {
+							if (member.discordId && member.discordId !== leadDiscordId) {
+								desiredIds.add(member.discordId);
+							}
+						}
+
+						// 3. Diff against the channel's current permission overwrites
+						const currentOverwrites = cityChannel.permissionOverwrites.cache;
+						const currentIds = new Set(currentOverwrites.keys());
+
+						let isMatch = desiredIds.size === currentIds.size;
+						if (isMatch) {
+							for (const id of desiredIds) {
+								if (!currentIds.has(id)) {
+									isMatch = false;
+									break;
+								}
+							}
+						}
+
+						// 4. If they match perfectly, skip execution to save compute and API calls
+						if (isMatch) {
+							// Optionally log skipping if needed, but keeping it silent reduces log spam
+							// logger.info(`[SYNC] Permissions already up to date for #${channelName}, skipping.`);
+							continue;
+						}
+
+						// 5. Mismatch detected: rebuild permissions and fetch users to ensure they are still in server
+						logger.info(`[SYNC] Mismatch detected for #${channelName}. Rebuilding permissions...`);
+
 						const overwrites = [
 							// Deny view for everyone
 							{
 								id: guild.roles.everyone.id,
 								deny: [PermissionFlagsBits.ViewChannel],
+								type: 0 // Role
 							}
 						];
 
 						// Explicitly preserve Staff Role if it exists
-						const STAFF_ROLE_ID = '1480620981587279993';
-						const staffRole = guild.roles.cache.get(STAFF_ROLE_ID);
 						if (staffRole) {
 							overwrites.push({
 								id: staffRole.id,
 								allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+								type: 0 // Role
 							});
 						}
 
@@ -88,6 +134,7 @@ module.exports = {
 								overwrites.push({
 									id: leadDiscordId,
 									allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+									type: 1 // Member
 								});
 								logger.info(`[SYNC]   -> Granted Lead access to <@${leadDiscordId}>`);
 							} else {
@@ -95,28 +142,21 @@ module.exports = {
 							}
 						}
 
-						// Fetch active team members
-						try {
-							const teamMembers = await notion.getTeamMembers(fork.id);
-							for (const member of teamMembers) {
-								if (member.discordId) {
-									// Add direct user overwrite (avoid duplicates if lead is also a team member)
-									if (member.discordId !== leadDiscordId) {
-										const teamMemberObj = await guild.members.fetch(member.discordId).catch(() => null);
-										if (teamMemberObj) {
-											overwrites.push({
-												id: member.discordId,
-												allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
-											});
-											logger.info(`[SYNC]   -> Granted Team Member access to <@${member.discordId}> (${member.role})`);
-										} else {
-											logger.warn(`[SYNC]   -> Team Member <@${member.discordId}> is not in the guild.`);
-										}
-									}
+						// Add team member overwrites
+						for (const member of teamMembers) {
+							if (member.discordId && member.discordId !== leadDiscordId) {
+								const teamMemberObj = await guild.members.fetch(member.discordId).catch(() => null);
+								if (teamMemberObj) {
+									overwrites.push({
+										id: member.discordId,
+										allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+										type: 1 // Member
+									});
+									logger.info(`[SYNC]   -> Granted Team Member access to <@${member.discordId}> (${member.role})`);
+								} else {
+									logger.warn(`[SYNC]   -> Team Member <@${member.discordId}> is not in the guild.`);
 								}
 							}
-						} catch (teamErr) {
-							logger.warn(`[SYNC] Could not fetch team members for fork ${city}: ${teamErr.message}`);
 						}
 
 						// Set the permission overwrites
