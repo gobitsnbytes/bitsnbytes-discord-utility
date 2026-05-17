@@ -22,11 +22,14 @@ module.exports = {
 			// 1. Check for existing active fork
 			const existingFork = await notion.findForkByCity(city);
 			if (existingFork && existingFork.properties?.Status?.select?.name === 'Active') {
-				const flags = config.PRIVACY.merge ? [MessageFlags.Ephemeral] : [];
-				return await interaction.editReply({
-					content: `❌ An active fork for **${city}** already exists.`,
-					flags
-				});
+				const existingDiscordId = existingFork.properties?.['Discord ID']?.rich_text?.[0]?.text?.content;
+				if (existingDiscordId && existingDiscordId !== user.id) {
+					const flags = config.PRIVACY.merge ? [MessageFlags.Ephemeral] : [];
+					return await interaction.editReply({
+						content: `❌ An active fork for **${city}** already exists.`,
+						flags
+					});
+				}
 			}
 
 			// 2. Assign @fork-lead role
@@ -39,7 +42,7 @@ module.exports = {
 			// 3. Update Notion
 			const fork = await notion.findForkByCity(city);
 			if (fork) {
-				await notion.updateForkStatus(fork.id, 'Active');
+				await notion.updateForkStatus(fork.id, 'Active', user.id);
 			}
 
 			// 4. Create/Setup City Channel
