@@ -13,11 +13,13 @@ module.exports = {
 		.addStringOption(option => 
 			option.setName('date')
 				.setDescription('Date of the meeting (YYYY-MM-DD)')
-				.setRequired(true))
+				.setRequired(true)
+				.setAutocomplete(true))
 		.addStringOption(option => 
 			option.setName('time')
-				.setDescription('Time of the meeting in 24h format (HH:MM)')
-				.setRequired(true))
+				.setDescription('Time of the meeting (HH:MM)')
+				.setRequired(true)
+				.setAutocomplete(true))
 		.addStringOption(option =>
 			option.setName('location-type')
 				.setDescription('Where the meeting will take place')
@@ -74,8 +76,8 @@ module.exports = {
 			const userInvite = interaction.options.getUser('user-invite');
 			const roleInvite = interaction.options.getRole('role-invite');
 
-			// Validate date & time
-			const dateTimeStr = `${dateStr}T${timeStr}:00`;
+			// Validate date & time in IST (UTC+5:30)
+			const dateTimeStr = `${dateStr}T${timeStr}:00+05:30`;
 			const scheduledTime = Date.parse(dateTimeStr);
 			if (isNaN(scheduledTime) || scheduledTime <= Date.now()) {
 				return await interaction.editReply({
@@ -114,12 +116,22 @@ module.exports = {
 				});
 			}
 
+			const istTimeString = new Date(scheduledTime).toLocaleString('en-US', {
+				timeZone: 'Asia/Kolkata',
+				hour12: true,
+				hour: 'numeric',
+				minute: '2-digit',
+				day: 'numeric',
+				month: 'short',
+				year: 'numeric'
+			}) + ' IST';
+
 			const embed = new EmbedBuilder()
 				.setTitle(`${config.EMOJIS.calendar} MEETING_SCHEDULED // CAL_ENTRY_CREATED`)
 				.setDescription(`A new meeting has been scheduled by <@${interaction.user.id}>.`)
 				.addFields(
 					{ name: '📋 TITLE', value: title, inline: false },
-					{ name: '📅 SCHEDULED TIME', value: `<t:${Math.floor(scheduledTime / 1000)}:F> (<t:${Math.floor(scheduledTime / 1000)}:R>)`, inline: false },
+					{ name: '📅 SCHEDULED TIME (IST)', value: `\`${istTimeString}\` (<t:${Math.floor(scheduledTime / 1000)}:F> / <t:${Math.floor(scheduledTime / 1000)}:R>)`, inline: false },
 					{ name: '🌐 LOCATION', value: locationType === 'discord_vc' ? 'Discord Temporary VC' : (locationDetails || 'External Link'), inline: true },
 					{ name: '👥 INVITEES', value: inviteesDisplay.join(', '), inline: true }
 				)
@@ -151,6 +163,72 @@ module.exports = {
 			await interaction.editReply({
 				content: `${config.EMOJIS.error} SYSTEM_FAILURE: Unable to schedule meeting.`
 			});
+		}
+	},
+
+	async autocomplete(interaction) {
+		const focusedOption = interaction.options.getFocused(true);
+		
+		if (focusedOption.name === 'date') {
+			const choices = [];
+			
+			// Get offset to convert to IST (Asia/Kolkata)
+			const getISTDate = (offsetDays) => {
+				const d = new Date();
+				const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+				const istTime = utc + (3600000 * 5.5);
+				return new Date(istTime + (offsetDays * 24 * 60 * 60 * 1000));
+			};
+
+			for (let i = 0; i < 7; i++) {
+				const targetDate = getISTDate(i);
+				const year = targetDate.getFullYear();
+				const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+				const day = String(targetDate.getDate()).padStart(2, '0');
+				const valueStr = `${year}-${month}-${day}`;
+				
+				let label = '';
+				if (i === 0) {
+					label = `Today (${targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+				} else if (i === 1) {
+					label = `Tomorrow (${targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+				} else {
+					label = targetDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+				}
+				
+				choices.push({ name: label, value: valueStr });
+			}
+
+			const filtered = choices.filter(choice => 
+				choice.name.toLowerCase().includes(focusedOption.value.toLowerCase())
+			);
+			await interaction.respond(focusedOption.value ? filtered.slice(0, 25) : choices.slice(0, 25)).catch(() => {});
+		}
+
+		if (focusedOption.name === 'time') {
+			const focusedValue = focusedOption.value;
+			const choices = [];
+			
+			// Generate 30-minute intervals
+			for (let hour = 0; hour < 24; hour++) {
+				for (let min of ['00', '30']) {
+					const hourStr = String(hour).padStart(2, '0');
+					const timeVal = `${hourStr}:${min}`;
+					
+					const period = hour >= 12 ? 'PM' : 'AM';
+					const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+					const label = `${String(displayHour).padStart(2, '0')}:${min} ${period} (IST)`;
+					
+					choices.push({ name: label, value: timeVal });
+				}
+			}
+
+			const filtered = choices.filter(choice => 
+				choice.name.toLowerCase().includes(focusedValue.toLowerCase()) ||
+				choice.value.includes(focusedValue)
+			);
+			
+			await interaction.respond(focusedValue ? filtered.slice(0, 25) : choices.slice(0, 25)).catch(() => {});
 		}
 	}
 };
