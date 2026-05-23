@@ -216,4 +216,22 @@ describe('Slash Command: /meet-schedule Authorization', () => {
 		expect(mockInteraction.deferReply).toHaveBeenCalled();
 		expect(mockInteraction.editReply).toHaveBeenCalled();
 	});
+
+	test('should reject past date/time', async () => {
+		mockMember.roles.cache.has.mockImplementation((roleId) => roleId === '1480620981587279993');
+		
+		mockInteraction.options.getString.mockImplementation((name) => {
+			if (name === 'title') return 'Past Meeting';
+			if (name === 'date') return '2020-01-01';
+			if (name === 'time') return '12:00';
+			if (name === 'location-type') return 'discord_vc';
+			return null;
+		});
+
+		await execute(mockInteraction);
+
+		expect(mockInteraction.editReply).toHaveBeenCalledWith(expect.objectContaining({
+			content: expect.stringContaining('Invalid date/time')
+		}));
+	});
 });
