@@ -127,7 +127,9 @@ module.exports = {
 
 		} catch (error) {
 			console.error('[ADMIN_ADD_LEAD_ERROR]', error);
-			await interaction.editReply('❌ There was an error while force-onboarding the fork lead.');
+			const logger = require('../lib/logger');
+			logger.error('Failed to force-onboard fork lead', error);
+			await interaction.editReply(`❌ There was an error while force-onboarding the fork lead: **${error.message}**`);
 		}
 	}
 };
