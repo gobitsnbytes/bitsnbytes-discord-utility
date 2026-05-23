@@ -131,6 +131,8 @@ safeStartJob('./jobs/reportReminders', client, 'reportReminders');
 safeStartJob('./jobs/reminderCheck', client, 'reminderCheck');
 safeStartJob('./jobs/monthlyWinner', client, 'monthlyWinner');
 safeStartJob('./jobs/reportLateUpdater', client, 'reportLateUpdater');
+safeStartJob('./jobs/meetingScheduler', client, 'meetingScheduler');
+safeStartJob('./jobs/notionProfileCheck', client, 'notionProfileCheck');
 
 console.log('[BOOT] Job initialization complete.');
 
