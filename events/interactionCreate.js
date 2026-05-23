@@ -49,6 +49,19 @@ module.exports = {
 					logger.error('Critical: Could not send error response to user', innerError);
 				}
 			}
+		} else if (interaction.isAutocomplete()) {
+			const command = interaction.client.commands.get(interaction.commandName);
+
+			if (!command) {
+				console.error(`No command matching ${interaction.commandName} was found for autocomplete.`);
+				return;
+			}
+
+			try {
+				await command.autocomplete(interaction);
+			} catch (error) {
+				console.error('[AUTOCOMPLETE_ERROR]', error);
+			}
 		} else if (interaction.isModalSubmit()) {
 			// Handle Modal Submissions if any (future use)
 		}

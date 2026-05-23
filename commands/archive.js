@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, MessageFlags, ChannelType } = require('discord.js');
 const notion = require('../lib/notion');
 const config = require('../config');
 
@@ -6,7 +6,11 @@ module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('archive')
 		.setDescription('Mark a fork as stale and archive it.')
-		.addStringOption(option => option.setName('city').setDescription('The city for the fork').setRequired(true))
+		.addStringOption(option => 
+			option.setName('city')
+				.setDescription('The city for the fork')
+				.setRequired(true)
+				.setAutocomplete(true))
 		.addStringOption(option => option.setName('reason').setDescription('The reason for archival').setRequired(true))
 		.setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
 
@@ -68,4 +72,62 @@ module.exports = {
 			await interaction.editReply('❌ There was an error while archiving the fork.');
 		}
 	},
+
+	async autocomplete(interaction) {
+		const focusedValue = interaction.options.getFocused();
+		const guild = interaction.guild;
+		const citiesSet = new Set();
+
+		// 1. Get cities from channels under 'FORKS' category
+		try {
+			const category = guild.channels.cache.find(c => 
+				c.name.toUpperCase() === 'FORKS' && 
+				c.type === ChannelType.GuildCategory
+			);
+			if (category) {
+				const channels = guild.channels.cache.filter(c => c.parentId === category.id);
+				for (const [, channel] of channels) {
+					let name = channel.name;
+					if (name.startsWith('gobitsnbytes-')) {
+						name = name.replace('gobitsnbytes-', '');
+					}
+					if (name.endsWith('-archived')) {
+						name = name.replace('-archived', '');
+					}
+					const cityTitleCase = name
+						.split('-')
+						.map(word => word.charAt(0).toUpperCase() + word.slice(1))
+						.join(' ');
+					
+					citiesSet.add(cityTitleCase);
+				}
+			}
+		} catch (err) {
+			console.warn('[ARCHIVE_AUTOCOMPLETE] Channel search failed:', err.message);
+		}
+
+		// 2. Fallback/merge with Notion database
+		try {
+			const forks = await notion.getForks();
+			for (const fork of forks) {
+				const city = fork.properties?.["What city are you in?"]?.rich_text?.[0]?.text?.content || 
+				             fork.properties?.City?.rich_text?.[0]?.text?.content || 
+				             fork.properties?.["Fork Name"]?.title?.[0]?.text?.content;
+				if (city) {
+					citiesSet.add(city);
+				}
+			}
+		} catch (err) {
+			console.warn('[ARCHIVE_AUTOCOMPLETE] Notion search failed:', err.message);
+		}
+
+		const citiesList = Array.from(citiesSet);
+		const filtered = citiesList.filter(city => 
+			city.toLowerCase().includes(focusedValue.toLowerCase())
+		);
+
+		await interaction.respond(
+			filtered.slice(0, 25).map(city => ({ name: city, value: city }))
+		).catch(() => {});
+	}
 };
