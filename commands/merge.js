@@ -91,7 +91,7 @@ module.exports = {
 
 			const handbookButton = new ButtonBuilder()
 				.setLabel(config.BRANDING.documentationLabel)
-				.setURL(process.env.FORK_HANDBOOK_URL || 'https://www.notion.so/33949ed2fc33818ba073ffa2d815bf1a?v=33949ed2fc3380ccbfe2000c860aa29a&source=copy_link')
+				.setURL('https://www.notion.so/33949ed2fc33818ba073ffa2d815bf1a?v=33949ed2fc3380ccbfe2000c860aa29a&source=copy_link')
 				.setStyle(ButtonStyle.Link);
 
 			const row = new ActionRowBuilder().addComponents(handbookButton);

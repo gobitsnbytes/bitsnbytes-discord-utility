@@ -557,7 +557,7 @@ NOTION_REPORTS_DB=       # Reports database
 NOTION_REMINDERS_DB=     # Smart reminders tracking database
 
 # Fork Handbook
-FORK_HANDBOOK_URL=
+FORK_HANDBOOK_URL=https://www.notion.so/33949ed2fc33818ba073ffa2d815bf1a?v=33949ed2fc3380ccbfe2000c860aa29a&source=copy_link
 ```
 
 ### Required Notion Databases
