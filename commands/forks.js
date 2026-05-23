@@ -48,18 +48,10 @@ module.exports = {
                 .filter(isValidFork)
                 .filter(f => f.properties?.Status?.select?.name === 'Pending');
 
-			const embed = new EmbedBuilder()
-				.setTitle(`${config.EMOJIS.protocol} NODE_TOPOLOGY // NET_STATUS_RECAP`)
-				.setColor(config.COLORS.primary)
-                .setTimestamp()
-                .setFooter({ text: config.BRANDING.footerText });
 
-            if (config.UI.useServerIcon) {
-                embed.setThumbnail(interaction.guild.iconURL());
-            }
 
             // Signal Readout Formatting
-            let activeList = active.map(f => {
+            const activeLines = active.map(f => {
                 const city = (f.properties?.["What city are you in?"]?.rich_text?.[0]?.text?.content || 
                              f.properties?.["Fork Name"]?.title?.[0]?.text?.content || 
                              'UNKNOWN').toUpperCase();
@@ -70,9 +62,9 @@ module.exports = {
                 const leadDisplay = leadId ? `<@${leadId}>` : (leadName || 'ANONYMOUS');
                 
                 return `\`${label}\` ${config.EMOJIS.active} **ONLINE** // ${leadDisplay}`;
-            }).join('\n') || '`NO_ACTIVE_PROTOCOLS_FOUND`';
+            });
 
-            let pendingList = pending.map(f => {
+            const pendingLines = pending.map(f => {
                 const city = (f.properties?.["What city are you in?"]?.rich_text?.[0]?.text?.content || 
                              f.properties?.["Fork Name"]?.title?.[0]?.text?.content || 
                              'PENDING').toUpperCase();
@@ -82,14 +74,42 @@ module.exports = {
                 const leadDisplay = leadName ? `(${leadName})` : '';
                 
                 return `\`${label}\` ${config.EMOJIS.pending} **DISCOVERY** ${leadDisplay}`;
-            }).join('\n') || '`NO_PENDING_SYNCHRONIZATIONS`';
+            });
 
-            embed.addFields(
-                { name: '⚛️ ACTIVE_PROTOCOLS', value: activeList },
-                { name: '⏳ NETWORK_DISCOVERY', value: pendingList }
+            const pages = [];
+            const pageSize = 10;
+            const maxPages = Math.max(
+                Math.ceil(activeLines.length / pageSize),
+                Math.ceil(pendingLines.length / pageSize),
+                1
             );
 
-			await interaction.editReply({ embeds: [embed] });
+            for (let pageIdx = 0; pageIdx < maxPages; pageIdx++) {
+                const activeChunk = activeLines.slice(pageIdx * pageSize, (pageIdx + 1) * pageSize);
+                const pendingChunk = pendingLines.slice(pageIdx * pageSize, (pageIdx + 1) * pageSize);
+
+                const activeList = activeChunk.join('\n') || '`NO_ACTIVE_PROTOCOLS_FOUND`';
+                const pendingList = pendingChunk.join('\n') || '`NO_PENDING_SYNCHRONIZATIONS`';
+
+                const embed = new EmbedBuilder()
+                    .setTitle(`${config.EMOJIS.protocol} NODE_TOPOLOGY // NET_STATUS_RECAP`)
+                    .setColor(config.COLORS.primary)
+                    .addFields(
+                        { name: `⚛️ ACTIVE_PROTOCOLS (Part ${pageIdx + 1}/${maxPages})`, value: activeList },
+                        { name: `⏳ NETWORK_DISCOVERY (Part ${pageIdx + 1}/${maxPages})`, value: pendingList }
+                    )
+                    .setTimestamp()
+                    .setFooter({ text: config.BRANDING.footerText });
+
+                if (config.UI.useServerIcon) {
+                    embed.setThumbnail(interaction.guild.iconURL());
+                }
+
+                pages.push(embed);
+            }
+
+            const { paginate } = require('../lib/pagination');
+            await paginate(interaction, pages, config.PRIVACY.forks);
 
 		} catch (error) {
 			console.error('[TOPOLOGY_ERROR]', error);

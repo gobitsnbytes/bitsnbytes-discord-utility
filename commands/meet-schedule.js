@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const meetingsDb = require('../lib/meetingsDb');
 const config = require('../config');
+const { createMeetingVoiceChannel, sendMeetingDMs } = require('../lib/meetingsHelper');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -10,16 +11,6 @@ module.exports = {
 			option.setName('title')
 				.setDescription('The title/subject of the meeting')
 				.setRequired(true))
-		.addStringOption(option => 
-			option.setName('date')
-				.setDescription('Date of the meeting (YYYY-MM-DD)')
-				.setRequired(true)
-				.setAutocomplete(true))
-		.addStringOption(option => 
-			option.setName('time')
-				.setDescription('Time of the meeting (HH:MM)')
-				.setRequired(true)
-				.setAutocomplete(true))
 		.addStringOption(option =>
 			option.setName('location-type')
 				.setDescription('Where the meeting will take place')
@@ -28,6 +19,20 @@ module.exports = {
 					{ name: 'Discord Voice Channel', value: 'discord_vc' },
 					{ name: 'External Link / Other', value: 'external' }
 				))
+		.addStringOption(option => 
+			option.setName('date')
+				.setDescription('Date of the meeting (YYYY-MM-DD). Optional if instant.')
+				.setRequired(false)
+				.setAutocomplete(true))
+		.addStringOption(option => 
+			option.setName('time')
+				.setDescription('Time of the meeting (HH:MM). Optional if instant.')
+				.setRequired(false)
+				.setAutocomplete(true))
+		.addBooleanOption(option =>
+			option.setName('instant')
+				.setDescription('Schedule the meeting instantly (starts now)')
+				.setRequired(false))
 		.addUserOption(option => 
 			option.setName('user-invite')
 				.setDescription('Individual user to invite')
@@ -75,18 +80,56 @@ module.exports = {
 			const description = interaction.options.getString('description') || '';
 			const userInvite = interaction.options.getUser('user-invite');
 			const roleInvite = interaction.options.getRole('role-invite');
+			const instant = interaction.options.getBoolean('instant') || false;
 
-			// Validate date & time in IST (UTC+5:30)
-			const dateTimeStr = `${dateStr}T${timeStr}:00+05:30`;
-			const scheduledTime = Date.parse(dateTimeStr);
-			if (isNaN(scheduledTime) || scheduledTime <= Date.now()) {
-				return await interaction.editReply({
-					content: `${config.EMOJIS.error} Invalid date/time. Ensure it is in the future and formatted as YYYY-MM-DD and HH:MM.`
-				});
+			let scheduledTime;
+			if (instant || (!dateStr && !timeStr)) {
+				scheduledTime = Date.now();
+			} else {
+				if (!dateStr || !timeStr) {
+					return await interaction.editReply({
+						content: `${config.EMOJIS.error} You must specify both date and time, or set the instant option to True.`
+					});
+				}
+				// Validate date & time in IST (UTC+5:30)
+				const dateTimeStr = `${dateStr}T${timeStr}:00+05:30`;
+				scheduledTime = Date.parse(dateTimeStr);
+				if (isNaN(scheduledTime) || scheduledTime <= Date.now()) {
+					return await interaction.editReply({
+						content: `${config.EMOJIS.error} Invalid date/time. Ensure it is in the future and formatted as YYYY-MM-DD and HH:MM.`
+					});
+				}
 			}
 
 			// Generate a unique ID
 			const id = `meet_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+			const guild = interaction.guild;
+
+			const inviteesDisplay = [];
+			const attendeesToAdd = [];
+			// Add attendees
+			if (userInvite) {
+				inviteesDisplay.push(`<@${userInvite.id}>`);
+				attendeesToAdd.push({ type: 'user', id: userInvite.id });
+			}
+			if (roleInvite) {
+				inviteesDisplay.push(`<@&${roleInvite.id}>`);
+				attendeesToAdd.push({ type: 'role', id: roleInvite.id });
+			}
+
+			if (inviteesDisplay.length === 0) {
+				return await interaction.editReply({
+					content: `${config.EMOJIS.error} You must specify at least a user or a role invitee.`
+				});
+			}
+
+			const timeDiff = scheduledTime - Date.now();
+			const isInstant = timeDiff <= 5 * 60 * 1000;
+			
+			let initialStatus = 'scheduled';
+			if (isInstant) {
+				initialStatus = locationType === 'discord_vc' ? 'active' : 'completed';
+			}
 
 			// Create the meeting record
 			await meetingsDb.createMeeting({
@@ -96,24 +139,31 @@ module.exports = {
 				scheduledTime,
 				locationType,
 				locationDetails,
-				creatorId: interaction.user.id
+				creatorId: interaction.user.id,
+				status: initialStatus
 			});
 
-			const inviteesDisplay = [];
-			// Add attendees
-			if (userInvite) {
-				await meetingsDb.addAttendee(id, 'user', userInvite.id);
-				inviteesDisplay.push(`<@${userInvite.id}>`);
-			}
-			if (roleInvite) {
-				await meetingsDb.addAttendee(id, 'role', roleInvite.id);
-				inviteesDisplay.push(`<@&${roleInvite.id}>`);
+			for (const att of attendeesToAdd) {
+				await meetingsDb.addAttendee(id, att.type, att.id);
 			}
 
-			if (inviteesDisplay.length === 0) {
-				return await interaction.editReply({
-					content: `${config.EMOJIS.error} You must specify at least a user or a role invitee.`
-				});
+			let vcLink = '';
+			
+			// If scheduled within 5 minutes (or instantly), provision VC and send DMs immediately
+			if (isInstant) {
+				const createdMeeting = await meetingsDb.getMeeting(id);
+				if (createdMeeting) {
+					if (locationType === 'discord_vc') {
+						const vcChannel = await createMeetingVoiceChannel(guild, createdMeeting);
+						if (vcChannel) {
+							vcLink = `https://discord.com/channels/${guild.id}/${vcChannel.id}`;
+						}
+					}
+					// Send DM notification to attendees immediately
+					await sendMeetingDMs(guild, createdMeeting, vcLink);
+					// Record that the 5-minute reminder has been sent so the scheduler doesn't run it again
+					await meetingsDb.recordReminderSent(id, '5m');
+				}
 			}
 
 			const istTimeString = new Date(scheduledTime).toLocaleString('en-US', {
@@ -126,16 +176,24 @@ module.exports = {
 				year: 'numeric'
 			}) + ' IST';
 
+			const embedTitle = isInstant 
+				? `⚛️ MEETING_COMMENCEMENT // LIVE` 
+				: `${config.EMOJIS.calendar} MEETING_SCHEDULED // CAL_ENTRY_CREATED`;
+				
+			const embedDescription = isInstant
+				? `An instant meeting has been started by <@${interaction.user.id}>.`
+				: `A new meeting has been scheduled by <@${interaction.user.id}>.`;
+
 			const embed = new EmbedBuilder()
-				.setTitle(`${config.EMOJIS.calendar} MEETING_SCHEDULED // CAL_ENTRY_CREATED`)
-				.setDescription(`A new meeting has been scheduled by <@${interaction.user.id}>.`)
+				.setTitle(embedTitle)
+				.setDescription(embedDescription)
 				.addFields(
 					{ name: '📋 TITLE', value: title, inline: false },
 					{ name: '📅 SCHEDULED TIME (IST)', value: `\`${istTimeString}\` (<t:${Math.floor(scheduledTime / 1000)}:F> / <t:${Math.floor(scheduledTime / 1000)}:R>)`, inline: false },
-					{ name: '🌐 LOCATION', value: locationType === 'discord_vc' ? 'Discord Temporary VC' : (locationDetails || 'External Link'), inline: true },
+					{ name: '🌐 LOCATION', value: locationType === 'discord_vc' ? (vcLink ? `🔊 [Click to Join VC](${vcLink})` : 'Discord Temporary VC') : (locationDetails || 'External Link'), inline: true },
 					{ name: '👥 INVITEES', value: inviteesDisplay.join(', '), inline: true }
 				)
-				.setColor(config.COLORS.success)
+				.setColor(isInstant ? config.COLORS.primary : config.COLORS.success)
 				.setTimestamp()
 				.setFooter({ text: config.BRANDING.footerText });
 

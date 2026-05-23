@@ -68,26 +68,38 @@ module.exports = {
 		pushChunkedFields('🛠️ NODE_OPERATIONS', forkCmds);
 		pushChunkedFields('🛡️ ROOT_ACCESS_ONLY', staffCmds);
 
-		const embed = new EmbedBuilder()
-			.setTitle(`${config.EMOJIS.help} BITS&BYTES_OS // CMD_REFERENCE_V${config.BRANDING.version || '2.0'}`)
-			.setDescription('Use this to see what each command does, plus who it is meant for.')
-			.setColor(config.COLORS.primary)
-            .setThumbnail(interaction.guild.iconURL())
-			.addFields(fields.length ? fields : [{ name: 'Commands', value: '*EMPTY*' }])
-			.setTimestamp()
-            .setFooter({ text: config.BRANDING.footerText });
+		const pages = [];
+		const fieldsPerPage = 2;
+		
+		for (let i = 0; i < fields.length; i += fieldsPerPage) {
+			const pageFields = fields.slice(i, i + fieldsPerPage);
+			const embed = new EmbedBuilder()
+				.setTitle(`${config.EMOJIS.help} BITS&BYTES_OS // CMD_REFERENCE_V${config.BRANDING.version || '2.0'}`)
+				.setDescription('Use this to see what each command does, plus who it is meant for.')
+				.setColor(config.COLORS.primary)
+				.setThumbnail(interaction.guild.iconURL())
+				.addFields(pageFields)
+				.setTimestamp()
+				.setFooter({ text: config.BRANDING.footerText });
+			pages.push(embed);
+		}
+
+		if (pages.length === 0) {
+			pages.push(new EmbedBuilder()
+				.setTitle(`${config.EMOJIS.help} BITS&BYTES_OS // CMD_REFERENCE_V${config.BRANDING.version || '2.0'}`)
+				.setDescription('No commands registered.')
+				.setColor(config.COLORS.primary)
+				.setFooter({ text: config.BRANDING.footerText }));
+		}
 
 		const button = new ButtonBuilder()
 			.setLabel(config.BRANDING.documentationLabel)
 			.setURL('https://www.notion.so/33949ed2fc33818ba073ffa2d815bf1a?v=33949ed2fc3380ccbfe2000c860aa29a&source=copy_link')
 			.setStyle(ButtonStyle.Link);
 
-        const row = new ActionRowBuilder().addComponents(button);
+		const extraRow = new ActionRowBuilder().addComponents(button);
 
-		await interaction.reply({ 
-            embeds: [embed], 
-            components: [row],
-            flags: config.PRIVACY.help ? [MessageFlags.Ephemeral] : []
-        });
+		const { paginate } = require('../lib/pagination');
+		await paginate(interaction, pages, config.PRIVACY.help, extraRow);
 	},
 };

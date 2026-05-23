@@ -2,32 +2,7 @@ const cron = require('node-cron');
 const { ChannelType, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const meetingsDb = require('../lib/meetingsDb');
 const config = require('../config');
-
-// Helper to resolve all user IDs from meeting attendees
-async function resolveAttendeeUserIds(guild, attendees) {
-	const userIds = new Set();
-	
-	for (const attendee of attendees) {
-		if (attendee.type === 'user') {
-			userIds.add(attendee.discordId);
-		} else if (attendee.type === 'role') {
-			try {
-				const role = guild.roles.cache.get(attendee.discordId);
-				if (role) {
-					// Fetch members to ensure cache is populated
-					await guild.members.fetch();
-					role.members.forEach(member => {
-						userIds.add(member.id);
-					});
-				}
-			} catch (err) {
-				console.error(`[MEETING] Error fetching members for role ${attendee.discordId}:`, err.message);
-			}
-		}
-	}
-	
-	return userIds;
-}
+const { resolveAttendeeUserIds, createMeetingVoiceChannel, sendMeetingDMs } = require('../lib/meetingsHelper');
 
 module.exports = (client) => {
 	// Run every minute
@@ -68,61 +43,14 @@ module.exports = (client) => {
 						let vcLink = '';
 						
 						if (meeting.location_type === 'discord_vc') {
-							// Find or create 'EVENTS' category
-							let category = guild.channels.cache.find(c => c.name.toUpperCase() === 'EVENTS' && c.type === ChannelType.GuildCategory);
-							if (!category) {
-								category = await guild.channels.create({
-									name: 'EVENTS',
-									type: ChannelType.GuildCategory
-								}).catch(() => null);
-							}
-
-							// Setup permissions
-							const STAFF_ROLE_ID = '1480620981587279993';
-							const overwrites = [
-								{
-									id: guild.roles.everyone.id,
-									deny: [PermissionFlagsBits.ViewChannel]
-								},
-								{
-									id: meeting.creator_id,
-									allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak]
-								}
-							];
-
-							const staffRole = guild.roles.cache.get(STAFF_ROLE_ID);
-							if (staffRole) {
-								overwrites.push({
-									id: staffRole.id,
-									allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak]
-								});
-							}
-
-							for (const attendee of meeting.attendees) {
-								overwrites.push({
-									id: attendee.discordId,
-									allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak]
-								});
-							}
-
-							// Create Voice Channel
-							const vcChannel = await guild.channels.create({
-								name: `🔊 ${meeting.title}`,
-								type: ChannelType.GuildVoice,
-								parent: category ? category.id : null,
-								permissionOverwrites: overwrites
-							}).catch(err => {
-								console.error(`[MEETING] VC creation failed:`, err.message);
-								return null;
-							});
-
+							const vcChannel = await createMeetingVoiceChannel(guild, meeting);
 							if (vcChannel) {
-								await meetingsDb.setTempChannelId(meeting.id, vcChannel.id);
 								vcLink = `https://discord.com/channels/${guild.id}/${vcChannel.id}`;
 							}
 						}
 
 						await sendChannelReminder(guild, meeting, '5 minutes', vcLink);
+						await sendMeetingDMs(guild, meeting, vcLink);
 						await meetingsDb.recordReminderSent(meeting.id, '5m');
 					}
 				}

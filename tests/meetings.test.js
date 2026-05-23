@@ -169,6 +169,7 @@ describe('Slash Command: /meet-schedule Authorization', () => {
 				getString: jest.fn(),
 				getUser: jest.fn(),
 				getRole: jest.fn(),
+				getBoolean: jest.fn(),
 			},
 		};
 	});
@@ -197,5 +198,22 @@ describe('Slash Command: /meet-schedule Authorization', () => {
 		await execute(mockInteraction);
 
 		expect(mockInteraction.deferReply).toHaveBeenCalled();
+	});
+
+	test('should schedule instantly if instant option is set to true', async () => {
+		mockMember.roles.cache.has.mockImplementation((roleId) => roleId === '1480620981587279993');
+		
+		mockInteraction.options.getString.mockImplementation((name) => {
+			if (name === 'title') return 'Instant VC';
+			if (name === 'location-type') return 'discord_vc';
+			return null;
+		});
+		mockInteraction.options.getBoolean.mockReturnValue(true);
+		mockInteraction.options.getUser.mockReturnValue({ id: 'user_invite_id', send: jest.fn().mockResolvedValue(true) });
+
+		await execute(mockInteraction);
+
+		expect(mockInteraction.deferReply).toHaveBeenCalled();
+		expect(mockInteraction.editReply).toHaveBeenCalled();
 	});
 });
