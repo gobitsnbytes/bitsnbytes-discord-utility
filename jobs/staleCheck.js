@@ -15,9 +15,9 @@ module.exports = (client) => {
 		const now = new Date();
 
 		for (const fork of forks) {
-			const city = fork.properties.City.rich_text[0]?.text?.content;
+			const city = notion.getCityName(fork);
 			const lastPulse = fork.properties['Last Pulse']?.date?.start;
-			const leadId = fork.properties['Discord ID']?.rich_text[0]?.text?.content;
+			const leadId = fork.properties['Discord ID']?.rich_text?.[0]?.text?.content;
 
 			if (!lastPulse || !leadId) continue;
 

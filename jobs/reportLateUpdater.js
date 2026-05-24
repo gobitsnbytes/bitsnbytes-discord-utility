@@ -48,38 +48,76 @@ module.exports = (client) => {
 					let isLate = false;
 
 					if (report.type === 'monthly') {
-						// Monthly report: due on the last day of the month it was submitted
-						const lastDayOfMonth = new Date(submitYear, submitMonth + 1, 0).getDate();
-						const monthlyDeadline = new Date(submitYear, submitMonth + 1, 0, 23, 59, 59);
-						
-						// If we're past the deadline for this month's report
-						if (now > monthlyDeadline) {
-							isLate = true;
-						}
-					} else if (report.type === 'bi-weekly') {
-						// Bi-weekly report: due on 15th or last day of month
-						if (submitDay <= 15) {
-							// First half bi-weekly: due on the 15th
-							const deadline = new Date(submitYear, submitMonth, 15, 23, 59, 59);
-							if (now > deadline) {
+						const prevMonthDate = new Date(submitYear, submitMonth - 1, 1);
+						const hasPrevReport = reports.some(r => {
+							if (r.id === report.id || r.type !== 'monthly') return false;
+							const d = new Date(r.submittedDate);
+							return d.getMonth() === prevMonthDate.getMonth() && d.getFullYear() === prevMonthDate.getFullYear();
+						});
+
+						if (!hasPrevReport) {
+							const deadline = new Date(submitYear, submitMonth, 0, 23, 59, 59);
+							if (submittedDate > deadline) {
 								isLate = true;
 							}
 						} else {
-							// Second half bi-weekly: due on last day of month
-							const lastDay = new Date(submitYear, submitMonth + 1, 0).getDate();
-							const deadline = new Date(submitYear, submitMonth, lastDay, 23, 59, 59);
-							if (now > deadline) {
+							const deadline = new Date(submitYear, submitMonth + 1, 0, 23, 59, 59);
+							if (submittedDate > deadline) {
 								isLate = true;
+							}
+						}
+					} else if (report.type === 'bi-weekly') {
+						if (submitDay <= 15) {
+							const prevMonthDate = new Date(submitYear, submitMonth - 1, 16);
+							const hasPrevReport = reports.some(r => {
+								if (r.id === report.id || r.type !== 'bi-weekly') return false;
+								const d = new Date(r.submittedDate);
+								return d.getMonth() === prevMonthDate.getMonth() && 
+								       d.getFullYear() === prevMonthDate.getFullYear() && 
+								       d.getDate() >= 16;
+							});
+
+							if (!hasPrevReport) {
+								const lastDayPrev = new Date(submitYear, submitMonth, 0).getDate();
+								const deadline = new Date(submitYear, submitMonth - 1, lastDayPrev, 23, 59, 59);
+								if (submittedDate > deadline) {
+									isLate = true;
+								}
+							} else {
+								const deadline = new Date(submitYear, submitMonth, 15, 23, 59, 59);
+								if (submittedDate > deadline) {
+									isLate = true;
+								}
+							}
+						} else {
+							const hasPrevReport = reports.some(r => {
+								if (r.id === report.id || r.type !== 'bi-weekly') return false;
+								const d = new Date(r.submittedDate);
+								return d.getMonth() === submitMonth && 
+								       d.getFullYear() === submitYear && 
+								       d.getDate() <= 15;
+							});
+
+							if (!hasPrevReport) {
+								const deadline = new Date(submitYear, submitMonth, 15, 23, 59, 59);
+								if (submittedDate > deadline) {
+									isLate = true;
+								}
+							} else {
+								const lastDay = new Date(submitYear, submitMonth + 1, 0).getDate();
+								const deadline = new Date(submitYear, submitMonth, lastDay, 23, 59, 59);
+								if (submittedDate > deadline) {
+									isLate = true;
+								}
 							}
 						}
 					}
 
 					if (isLate) {
 						try {
-							// Update report status to 'late'
 							await notion.updateReport(report.id, { status: 'late' });
 							updatedCount++;
-							console.log(`[JOB] Marked report ${report.id} as late for fork in ${fork.properties.City?.rich_text?.[0]?.text?.content || 'unknown'}`);
+							console.log(`[JOB] Marked report ${report.id} as late for fork in ${notion.getCityName(fork)}`);
 						} catch (e) {
 							console.error(`[JOB] Failed to mark report ${report.id} as late:`, e.message);
 						}

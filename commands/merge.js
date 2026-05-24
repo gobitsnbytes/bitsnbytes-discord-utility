@@ -33,7 +33,8 @@ module.exports = {
 			}
 
 			// 2. Assign @fork-lead role
-			const forkLeadRole = guild.roles.cache.find(r => r.name === 'fork-lead');
+			const forkLeadRoleId = process.env.FORK_LEAD_ROLE_ID || '1490410901147488286';
+			const forkLeadRole = guild.roles.cache.get(forkLeadRoleId) || guild.roles.cache.find(r => r.name === 'fork-lead' || r.name === 'fork lead');
 			if (!forkLeadRole) throw new Error('@fork-lead role not found in server.');
 			
 			const member = await guild.members.fetch(user.id);

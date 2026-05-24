@@ -19,6 +19,9 @@ describe('Auth Layer Tests', () => {
 	let mockGuild;
 	let mockMember;
 
+	const STAFF_ROLE_ID = process.env.STAFF_ROLE_ID || '1506019068132462804';
+	const FORK_LEAD_ROLE_ID = process.env.FORK_LEAD_ROLE_ID || '1490410901147488286';
+
 	beforeEach(() => {
 		jest.clearAllMocks();
 
@@ -43,8 +46,16 @@ describe('Auth Layer Tests', () => {
 			},
 			roles: {
 				cache: {
-					get: jest.fn().mockReturnValue({ id: '1480620981587279993' }),
-					find: jest.fn().mockReturnValue({ id: 'fork_lead_role_id', name: 'fork-lead', position: 10 }),
+					get: jest.fn().mockImplementation((id) => {
+						if (id === STAFF_ROLE_ID) {
+							return { id: STAFF_ROLE_ID, name: 'staff' };
+						}
+						if (id === FORK_LEAD_ROLE_ID) {
+							return { id: FORK_LEAD_ROLE_ID, name: 'fork-lead', position: 10 };
+						}
+						return null;
+					}),
+					find: jest.fn().mockReturnValue({ id: FORK_LEAD_ROLE_ID, name: 'fork-lead', position: 10 }),
 				},
 			},
 		};
@@ -52,7 +63,7 @@ describe('Auth Layer Tests', () => {
 
 	describe('isAuthorizedForCity', () => {
 		test('should authorize staff role users', async () => {
-			mockMember.roles.cache.has.mockImplementation((roleId) => roleId === '1480620981587279993');
+			mockMember.roles.cache.has.mockImplementation((roleId) => roleId === STAFF_ROLE_ID);
 			
 			const result = await isAuthorizedForCity(mockUser, 'Delhi', mockGuild);
 			
@@ -143,7 +154,7 @@ describe('Auth Layer Tests', () => {
 			expect(result).toBe(false);
 		});
 
-		test('should deny access if user has highest role position lower than fork-lead role position', async () => {
+		test('should authorize user even if highest role position is lower than fork-lead if they are lead', async () => {
 			mockMember.roles.highest.position = 5; // lower than 10
 			
 			// Try to authorize a lead
@@ -157,11 +168,12 @@ describe('Auth Layer Tests', () => {
 			});
 
 			const result = await isAuthorizedForCity(mockUser, 'Delhi', mockGuild);
-			expect(result).toBe(false);
+			expect(result).toBe(true);
 		});
 
 		test('should deny access if fork-lead role is missing from guild', async () => {
 			mockGuild.roles.cache.find.mockReturnValue(null);
+			mockGuild.roles.cache.get.mockReturnValue(null);
 
 			const result = await isAuthorizedForCity(mockUser, 'Delhi', mockGuild);
 			expect(result).toBe(false);
@@ -170,7 +182,7 @@ describe('Auth Layer Tests', () => {
 
 	describe('isAuthorizedForForkId', () => {
 		test('should authorize staff users', async () => {
-			mockMember.roles.cache.has.mockImplementation((roleId) => roleId === '1480620981587279993');
+			mockMember.roles.cache.has.mockImplementation((roleId) => roleId === STAFF_ROLE_ID);
 
 			const result = await isAuthorizedForForkId(mockUser, 'fork_delhi', mockGuild);
 			

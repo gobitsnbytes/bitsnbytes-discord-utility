@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const meetingsDb = require('../lib/meetingsDb');
 const config = require('../config');
-const { createMeetingVoiceChannel, sendMeetingDMs } = require('../lib/meetingsHelper');
+const { createMeetingVoiceChannel, sendMeetingDMs, sendMeetingEmails } = require('../lib/meetingsHelper');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -48,6 +48,14 @@ module.exports = {
 		.addStringOption(option => 
 			option.setName('description')
 				.setDescription('Meeting description or agenda')
+				.setRequired(false))
+		.addStringOption(option =>
+			option.setName('external-emails')
+				.setDescription('Additional external guest emails (comma separated)')
+				.setRequired(false))
+		.addIntegerOption(option =>
+			option.setName('duration')
+				.setDescription('Duration of the meeting in minutes (default: 30)')
 				.setRequired(false)),
 
 	async execute(interaction) {
@@ -81,6 +89,8 @@ module.exports = {
 			const userInvite = interaction.options.getUser('user-invite');
 			const roleInvite = interaction.options.getRole('role-invite');
 			const instant = interaction.options.getBoolean('instant') || false;
+			const externalEmailsStr = interaction.options.getString('external-emails') || '';
+			const duration = (typeof interaction.options.getInteger === 'function' ? interaction.options.getInteger('duration') : null) || 30;
 
 			let scheduledTime;
 			if (instant || (!dateStr && !timeStr)) {
@@ -101,6 +111,11 @@ module.exports = {
 				}
 			}
 
+			const endTime = scheduledTime + duration * 60 * 1000;
+			const externalEmails = externalEmailsStr
+				? externalEmailsStr.split(',').map(e => e.trim().toLowerCase()).filter(e => e.includes('@'))
+				: [];
+
 			// Generate a unique ID
 			const id = `meet_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 			const guild = interaction.guild;
@@ -117,10 +132,48 @@ module.exports = {
 				attendeesToAdd.push({ type: 'role', id: roleInvite.id });
 			}
 
-			if (inviteesDisplay.length === 0) {
+			if (inviteesDisplay.length === 0 && externalEmails.length === 0) {
 				return await interaction.editReply({
-					content: `${config.EMOJIS.error} You must specify at least a user or a role invitee.`
+					content: `${config.EMOJIS.error} You must specify at least one user, role invitee, or external email guest.`
 				});
+			}
+
+			// Push booking to Cal.com if configured
+			let calcomBookingId = null;
+			if (process.env.CALCOM_API_KEY) {
+				try {
+					const calcom = require('../lib/calcom');
+					const eventTypes = await calcom.getEventTypes();
+					if (eventTypes && eventTypes.length > 0) {
+						const eventType = eventTypes[0];
+						const creatorEmail = await meetingsDb.getUserEmail(interaction.user.id) || process.env.SMTP_USER || 'hello@gobitsnbytes.org';
+						
+						const bookingBody = {
+							eventTypeId: eventType.id,
+							start: new Date(scheduledTime).toISOString(),
+							end: new Date(endTime).toISOString(),
+							metadata: {
+								discord_meeting_id: id
+							},
+							attendee: {
+								name: interaction.user.username,
+								email: creatorEmail,
+								timeZone: 'Asia/Kolkata'
+							}
+						};
+
+						if (externalEmails.length > 0) {
+							bookingBody.guests = externalEmails;
+						}
+
+						const bookingResponse = await calcom.createBooking(bookingBody);
+						if (bookingResponse && (bookingResponse.uid || bookingResponse.id)) {
+							calcomBookingId = String(bookingResponse.uid || bookingResponse.id);
+						}
+					}
+				} catch (calcomErr) {
+					console.warn('[MEET_SCHEDULE] Cal.com sync failed:', calcomErr.message);
+				}
 			}
 
 			const timeDiff = scheduledTime - Date.now();
@@ -140,7 +193,10 @@ module.exports = {
 				locationType,
 				locationDetails,
 				creatorId: interaction.user.id,
-				status: initialStatus
+				status: initialStatus,
+				calcomBookingId,
+				endTime,
+				externalEmails
 			});
 
 			for (const att of attendeesToAdd) {
@@ -184,6 +240,11 @@ module.exports = {
 				? `An instant meeting has been started by <@${interaction.user.id}>.`
 				: `A new meeting has been scheduled by <@${interaction.user.id}>.`;
 
+			const displayInvitees = [...inviteesDisplay];
+			for (const email of externalEmails) {
+				displayInvitees.push(`\`${email}\``);
+			}
+
 			const embed = new EmbedBuilder()
 				.setTitle(embedTitle)
 				.setDescription(embedDescription)
@@ -191,7 +252,7 @@ module.exports = {
 					{ name: '📋 TITLE', value: title, inline: false },
 					{ name: '📅 SCHEDULED TIME (IST)', value: `\`${istTimeString}\` (<t:${Math.floor(scheduledTime / 1000)}:F> / <t:${Math.floor(scheduledTime / 1000)}:R>)`, inline: false },
 					{ name: '🌐 LOCATION', value: locationType === 'discord_vc' ? (vcLink ? `🔊 [Click to Join VC](${vcLink})` : 'Discord Temporary VC') : (locationDetails || 'External Link'), inline: true },
-					{ name: '👥 INVITEES', value: inviteesDisplay.join(', '), inline: true }
+					{ name: '👥 INVITEES', value: displayInvitees.join(', ') || 'None', inline: true }
 				)
 				.setColor(isInstant ? config.COLORS.primary : config.COLORS.success)
 				.setTimestamp()
@@ -201,8 +262,9 @@ module.exports = {
 				embed.addFields({ name: '📝 DESCRIPTION', value: description, inline: false });
 			}
 
-			// Post the confirmation in the alerts channel
-			const eventsChannel = interaction.guild.channels.cache.find(c => c.name === 'events' || c.name === 'pulse' || c.name === 'leads-council');
+			// Post the confirmation in the events channel
+			const { getEventsChannel } = require('../lib/calcomWebhook');
+			const eventsChannel = getEventsChannel(guild);
 			if (eventsChannel) {
 				await eventsChannel.send({
 					content: `🔔 **Meeting Alert**: ${inviteesDisplay.join(' ')}`,
@@ -215,6 +277,12 @@ module.exports = {
 				content: `✅ Meeting successfully scheduled! Confirmation sent to channel.`,
 				embeds: [embed]
 			});
+
+			// Send email invitations to attendees
+			const createdMeetingForEmail = await meetingsDb.getMeeting(id);
+			if (createdMeetingForEmail) {
+				await sendMeetingEmails(guild, createdMeetingForEmail, 'invite');
+			}
 
 		} catch (error) {
 			console.error('[MEET_SCHEDULE_ERROR]', error);

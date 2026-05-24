@@ -4,7 +4,19 @@ const meetingsDb = require('../lib/meetingsDb');
 const config = require('../config');
 const { resolveAttendeeUserIds, createMeetingVoiceChannel, sendMeetingDMs } = require('../lib/meetingsHelper');
 
+const { getEventsChannel } = require('../lib/calcomWebhook');
+
 module.exports = (client) => {
+	// Run Cal.com sync every 2 minutes
+	cron.schedule('*/2 * * * *', async () => {
+		try {
+			const { syncCalcomBookings } = require('../lib/calcomWebhook');
+			await syncCalcomBookings(client);
+		} catch (error) {
+			console.error('[MEETING SCHEDULER] Cal.com sync job error:', error);
+		}
+	});
+
 	// Run every minute
 	cron.schedule('* * * * *', async () => {
 		const guild = client.guilds.cache.first();
@@ -23,6 +35,8 @@ module.exports = (client) => {
 					const sent = await meetingsDb.hasReminderBeenSent(meeting.id, '12h');
 					if (!sent) {
 						await sendChannelReminder(guild, meeting, '12 hours');
+						const meetingsHelper = require('../lib/meetingsHelper');
+						await meetingsHelper.sendMeetingEmails(guild, meeting, 'reminder', '12 hours');
 						await meetingsDb.recordReminderSent(meeting.id, '12h');
 					}
 				}
@@ -32,6 +46,8 @@ module.exports = (client) => {
 					const sent = await meetingsDb.hasReminderBeenSent(meeting.id, '30m');
 					if (!sent) {
 						await sendChannelReminder(guild, meeting, '30 minutes');
+						const meetingsHelper = require('../lib/meetingsHelper');
+						await meetingsHelper.sendMeetingEmails(guild, meeting, 'reminder', '30 minutes');
 						await meetingsDb.recordReminderSent(meeting.id, '30m');
 					}
 				}
@@ -114,7 +130,7 @@ module.exports = (client) => {
 
 					// Send pings for missing users
 					if (missingUsers.length > 0) {
-						const eventsChannel = guild.channels.cache.find(c => c.name === 'events' || c.name === 'pulse' || c.name === 'leads-council');
+						const eventsChannel = getEventsChannel(guild);
 						
 						for (const userId of missingUsers) {
 							const lastPing = await meetingsDb.getLastPingTime(meeting.id, userId);
@@ -139,14 +155,14 @@ module.exports = (client) => {
 };
 
 async function sendChannelReminder(guild, meeting, timeLabel, vcLink = '') {
-	const eventsChannel = guild.channels.cache.find(c => c.name === 'events' || c.name === 'pulse' || c.name === 'leads-council');
+	const eventsChannel = getEventsChannel(guild);
 	if (!eventsChannel) return;
 
 	const tags = meeting.attendees.map(a => a.type === 'user' ? `<@${a.discordId}>` : `<@&${a.discordId}>`).join(' ');
 
 	const embed = new EmbedBuilder()
 		.setTitle(`${config.EMOJIS.reminder} MEETING_REMINDER // ${timeLabel.toUpperCase()}_REMAINING`)
-		.setDescription(`The meeting "**${meeting.title}**" starts in ${timeLabel}.`)
+		.setDescription("The meeting \"**" + meeting.title + "**\" starts in " + timeLabel + ".")
 		.addFields(
 			{ name: '📅 START TIME', value: `<t:${Math.floor(meeting.scheduled_time / 1000)}:F> (<t:${Math.floor(meeting.scheduled_time / 1000)}:R>)`, inline: false }
 		)
@@ -167,14 +183,14 @@ async function sendChannelReminder(guild, meeting, timeLabel, vcLink = '') {
 }
 
 async function sendCommencementNotification(guild, meeting) {
-	const eventsChannel = guild.channels.cache.find(c => c.name === 'events' || c.name === 'pulse' || c.name === 'leads-council');
+	const eventsChannel = getEventsChannel(guild);
 	if (!eventsChannel) return;
 
 	const tags = meeting.attendees.map(a => a.type === 'user' ? `<@${a.discordId}>` : `<@&${a.discordId}>`).join(' ');
 
 	const embed = new EmbedBuilder()
 		.setTitle(`⚛️ MEETING_COMMENCEMENT // LIVE`)
-		.setDescription(`The meeting "**${meeting.title}**" is starting now!`)
+		.setDescription("The meeting \"**" + meeting.title + "**\" is starting now!")
 		.setColor(config.COLORS.primary)
 		.setTimestamp()
 		.setFooter({ text: config.BRANDING.footerText });

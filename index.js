@@ -137,6 +137,16 @@ safeStartJob('./jobs/notionProfileCheck', client, 'notionProfileCheck');
 
 console.log('[BOOT] Job initialization complete.');
 
+// Start webhook server if secret or port is configured
+if (process.env.CALCOM_WEBHOOK_SECRET || process.env.WEBHOOK_PORT) {
+	try {
+		const { startWebhookServer } = require('./webhookServer');
+		startWebhookServer(client);
+	} catch (webhookErr) {
+		logger.error('Failed to initialize Webhook server', webhookErr);
+	}
+}
+
 // Log in
 logger.boot('Attempting login...', null, false);
 client.login(process.env.DISCORD_TOKEN).catch(err => {

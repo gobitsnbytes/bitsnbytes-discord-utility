@@ -85,7 +85,7 @@ module.exports = (client) => {
 			let awardSucceeded = false;
 			try {
 				await notion.updateForkPoints(winner.fork.id, gamification.POINTS.MONTHLY_WINNER);
-				await notion.awardBadge(winner.fork.id, 'monthly_champion');
+				await notion.addBadgeToFork(winner.fork.id, 'monthly_champion');
 				awardSucceeded = true;
 			} catch (e) {
 				console.error('[JOB] Failed to award winner:', e.message);

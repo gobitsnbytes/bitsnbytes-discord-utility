@@ -18,27 +18,36 @@ module.exports = (client) => {
 				
 				if (fork) {
 					const leadId = fork.properties?.['Discord ID']?.rich_text?.[0]?.text?.content;
-					const status = fork.properties?.Status?.select?.name;
+					let status = fork.properties?.Status?.select?.name;
 
-					if (leadId === profile.discord_id && status === 'Active') {
-						// Profile matches and is active! Resolve tracking.
-						await meetingsDb.resolvePendingProfile(profile.discord_id, profile.city);
-						console.log(`[JOB] Resolved pending profile for user ${profile.discord_id} in ${profile.city}.`);
-
-						// Fetch user and send DM
-						try {
-							const user = await client.users.fetch(profile.discord_id);
-							if (user) {
-								await user.send(
-									`🎉 **Registration Complete!**\n\n` +
-									`Your Notion profile for **${profile.city}** has been successfully detected and synchronized with the bot.\n` +
-									`Active health tracking, point calculations, and automated reminders are now enabled for your fork.`
-								).catch(() => {});
-							}
-						} catch (err) {
-							console.warn(`[JOB] Could not send confirmation DM to resolved user ${profile.discord_id}:`, err.message);
+					if (leadId === profile.discord_id) {
+						if (status === 'Pending') {
+							// Update Notion status to Active since they have onboarded in Discord
+							await notion.updateForkStatus(fork.id, 'Active');
+							status = 'Active';
+							console.log(`[JOB] Updated Notion status to Active for fork ${profile.city}.`);
 						}
-						continue;
+
+						if (status === 'Active') {
+							// Profile matches and is active! Resolve tracking.
+							await meetingsDb.resolvePendingProfile(profile.discord_id, profile.city);
+							console.log(`[JOB] Resolved pending profile for user ${profile.discord_id} in ${profile.city}.`);
+
+							// Fetch user and send DM
+							try {
+								const user = await client.users.fetch(profile.discord_id);
+								if (user) {
+									await user.send(
+										`🎉 **Registration Complete!**\n\n` +
+										`Your Notion profile for **${profile.city}** has been successfully detected and synchronized with the bot.\n` +
+										`Active health tracking, point calculations, and automated reminders are now enabled for your fork.`
+									).catch(() => {});
+								}
+							} catch (err) {
+								console.warn(`[JOB] Could not send confirmation DM to resolved user ${profile.discord_id}:`, err.message);
+							}
+							continue;
+						}
 					}
 				}
 

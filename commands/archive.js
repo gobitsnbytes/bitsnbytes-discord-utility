@@ -32,7 +32,8 @@ module.exports = {
             // 2. Remove @fork-lead role
             const forkLeadId = fork.properties?.['Discord ID']?.rich_text?.[0]?.text?.content;
             if (forkLeadId) {
-                const forkLeadRole = guild.roles.cache.find(r => r.name === 'fork-lead');
+                const forkLeadRoleId = process.env.FORK_LEAD_ROLE_ID || '1490410901147488286';
+                const forkLeadRole = guild.roles.cache.get(forkLeadRoleId) || guild.roles.cache.find(r => r.name === 'fork-lead' || r.name === 'fork lead');
                 if (forkLeadRole) {
                     const member = await guild.members.fetch(forkLeadId).catch(() => null);
                     if (member) await member.roles.remove(forkLeadRole);

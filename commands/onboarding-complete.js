@@ -23,8 +23,11 @@ module.exports = {
 
 	async execute(interaction) {
 		// Staff permission check
+		const allowedRoles = ['1506019068132462804', '1506323726223016149', '1480620981587279993'];
 		const member = await interaction.guild.members.fetch(interaction.user.id);
-		if (!member.roles.cache.has(STAFF_ROLE_ID)) {
+		const isAuthorized = allowedRoles.some(roleId => member.roles.cache.has(roleId)) || member.permissions.has('Administrator');
+
+		if (!isAuthorized) {
 			const unauthorizedEmbed = new EmbedBuilder()
 				.setTitle(`${config.EMOJIS.error} PROTOCOL_UNAUTHORIZED`)
 				.setDescription('Your credentials do not grant access to this command.')

@@ -87,5 +87,7 @@ module.exports = {
 		// New Phase 3 commands
 		leaderboard: false,        // Public - shows points leaderboard
 		'fork-badges': false,      // Public - shows achievements
+		'meet-email': true,        // Ephemeral - email registration
+		'meet-schedule': true      // Ephemeral - meeting scheduler
 	}
 };

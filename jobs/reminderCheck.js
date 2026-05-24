@@ -4,33 +4,20 @@ const healthScore = require('../lib/healthScore');
 const smartReminders = require('../lib/smartReminders');
 const { EmbedBuilder } = require('discord.js');
 
-// Simple in-memory reminder store to track sent reminders
+// Notion-persisted reminder store with a 30-day cooldown
 const reminderStore = {
-	sent: new Map(),
-	
-	// Generate unique ID for a reminder
-	getId(forkId, reminderType) {
-		return `${forkId}-${reminderType}`;
-	},
-	
-	// Check if reminder was already sent
-	hasBeenSent(id) {
-		return this.sent.has(id);
+	// Check if reminder was already sent and is within the 30-day cooldown
+	async hasBeenSent(forkId, reminderType) {
+		const lastSent = await notion.getSentReminder(forkId, reminderType);
+		if (!lastSent) return false;
+		
+		const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+		return lastSent >= thirtyDaysAgo;
 	},
 	
 	// Record that a reminder was sent
-	recordSent(id, timestamp = Date.now()) {
-		this.sent.set(id, timestamp);
-	},
-	
-	// Clean up old entries (older than 30 days)
-	cleanup() {
-		const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-		for (const [id, timestamp] of this.sent) {
-			if (timestamp < thirtyDaysAgo) {
-				this.sent.delete(id);
-			}
-		}
+	async recordSent(forkId, reminderType) {
+		await notion.recordSentReminder(forkId, reminderType);
 	}
 };
 
@@ -74,12 +61,15 @@ module.exports = (client) => {
 
 				// Only send if there are critical or high priority reminders
 				// Filter out reminders that were already sent
-				const urgentReminders = reminders.filter(
-					r => r.priority.level >= smartReminders.PRIORITY.HIGH.level
-				).filter(r => {
-					const reminderId = reminderStore.getId(fork.id, r.type);
-					return !reminderStore.hasBeenSent(reminderId);
-				});
+				const urgentReminders = [];
+				for (const r of reminders) {
+					if (r.priority.level >= smartReminders.PRIORITY.HIGH.level) {
+						const hasSent = await reminderStore.hasBeenSent(fork.id, r.type);
+						if (!hasSent) {
+							urgentReminders.push(r);
+						}
+					}
+				}
 
 				if (urgentReminders.length > 0) {
 					const embed = new EmbedBuilder()
@@ -99,8 +89,7 @@ module.exports = (client) => {
 
 					// Record successful sends
 					for (const reminder of urgentReminders) {
-						const reminderId = reminderStore.getId(fork.id, reminder.type);
-						reminderStore.recordSent(reminderId);
+						await reminderStore.recordSent(fork.id, reminder.type);
 					}
 				}
 			}

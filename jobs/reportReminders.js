@@ -59,11 +59,14 @@ module.exports = (client) => {
 				       submitted.getFullYear() === now.getFullYear() && 
 				       day >= 1 && day <= 15;
 			});
+			const targetMonthForSecondHalf = currentDay === 1 ? previousMonth.getMonth() : currentMonth;
+			const targetYearForSecondHalf = currentDay === 1 ? previousMonth.getFullYear() : now.getFullYear();
+
 			const secondHalfReports = reports.filter(r => {
 				const submitted = new Date(r.submittedDate);
 				const day = submitted.getDate();
-				return submitted.getMonth() === currentMonth && 
-				       submitted.getFullYear() === now.getFullYear() && 
+				return submitted.getMonth() === targetMonthForSecondHalf && 
+				       submitted.getFullYear() === targetYearForSecondHalf && 
 				       day >= 16;
 			});
 
