@@ -50,6 +50,27 @@ module.exports = {
 				roleAssigned = false;
 			}
 
+			// Resolve or create city role
+			let cityRole = guild.roles.cache.find(r => r.name.toLowerCase() === city.toLowerCase());
+			if (!cityRole) {
+				try {
+					cityRole = await guild.roles.create({
+						name: city,
+						reason: 'Direct onboard city role creation'
+					});
+				} catch (err) {
+					console.error(`[ADMIN_ADD_LEAD] Failed to create city role "${city}":`, err.message);
+				}
+			}
+			if (cityRole) {
+				try {
+					await member.roles.add(cityRole);
+				} catch (roleErr) {
+					console.error(`[ADMIN_ADD_LEAD] Failed to assign city role (${city}):`, roleErr.message);
+					roleAssigned = false;
+				}
+			}
+
 			// 2. Check Notion database
 			const fork = await notion.findForkByCity(city);
 			let notionStatus = 'synchronized';
@@ -129,10 +150,22 @@ module.exports = {
 			try {
 				const announcementChannel = await guild.channels.fetch('1490415427409412376');
 				if (announcementChannel) {
-					await announcementChannel.send(`**Bits&Bytes ${city}** is now live! Force-onboarded lead: <@${user.id}>`);
+					const capitalizedCity = city.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+					await announcementChannel.send(`**Bits&Bytes ${capitalizedCity}** is now live! Force-onboarded lead: <@${user.id}>`);
 				}
 			} catch (error) {
 				console.warn('[ADMIN_ADD_LEAD] Announcement fail:', error.message);
+			}
+
+			// 4. Trigger self-healing permissions sync immediately
+			try {
+				const { syncForkPermissions } = require('../lib/channelSync');
+				const updatedFork = await notion.findForkByCity(city);
+				if (updatedFork) {
+					await syncForkPermissions(guild.client, updatedFork);
+				}
+			} catch (syncErr) {
+				console.warn('[ADMIN_ADD_LEAD] Permission sync fail:', syncErr.message);
 			}
 
 		} catch (error) {

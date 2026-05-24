@@ -94,14 +94,12 @@ module.exports = {
 				// Update team completeness score
 				await notion.computeAndUpdateTeamCompleteness(forkId);
 
-				// Automatically grant channel access to the added member
-				const channelName = `gobitsnbytes-${city.toLowerCase().replace(/\s+/g, '-')}`;
-				const cityChannel = interaction.guild.channels.cache.find(c => c.name === channelName);
-				if (cityChannel) {
-					await cityChannel.permissionOverwrites.edit(discordId, {
-						ViewChannel: true,
-						SendMessages: true
-					});
+				// Trigger self-healing permissions sync immediately to grant access
+				try {
+					const { syncForkPermissions } = require('../lib/channelSync');
+					await syncForkPermissions(interaction.client, fork);
+				} catch (syncErr) {
+					console.warn('[TEAM_UPDATE] Permission sync fail:', syncErr.message);
 				}
 
 				// Get updated team for validation
@@ -157,16 +155,12 @@ module.exports = {
 				// Update team completeness score
 				await notion.computeAndUpdateTeamCompleteness(forkId);
 
-				// Automatically revoke channel access from the removed member if they have no other active roles in the team
-				const channelName = `gobitsnbytes-${city.toLowerCase().replace(/\s+/g, '-')}`;
-				const cityChannel = interaction.guild.channels.cache.find(c => c.name === channelName);
-				if (cityChannel) {
-					const remainingMembers = await notion.getTeamMembers(forkId);
-					const hasOtherRole = remainingMembers.some(m => m.discordId === discordId);
-					if (!hasOtherRole) {
-						// Remove their user-specific permission overwrite from the channel
-						await cityChannel.permissionOverwrites.delete(discordId);
-					}
+				// Trigger self-healing permissions sync immediately to update access
+				try {
+					const { syncForkPermissions } = require('../lib/channelSync');
+					await syncForkPermissions(interaction.client, fork);
+				} catch (syncErr) {
+					console.warn('[TEAM_UPDATE] Permission sync fail:', syncErr.message);
 				}
 
 				const embed = new EmbedBuilder()

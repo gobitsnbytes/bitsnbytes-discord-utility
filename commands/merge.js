@@ -42,8 +42,29 @@ module.exports = {
 			try {
 				await member.roles.add(forkLeadRole);
 			} catch (roleErr) {
-				console.error('[MERGE] Failed to assign role (hierarchy/permissions check):', roleErr.message);
+				console.error('[MERGE] Failed to assign fork-lead role (hierarchy/permissions check):', roleErr.message);
 				roleAssigned = false;
+			}
+
+			// Resolve or create city role
+			let cityRole = guild.roles.cache.find(r => r.name.toLowerCase() === city.toLowerCase());
+			if (!cityRole) {
+				try {
+					cityRole = await guild.roles.create({
+						name: city,
+						reason: 'Merge onboarding city role creation'
+					});
+				} catch (err) {
+					console.error(`[MERGE] Failed to create city role "${city}":`, err.message);
+				}
+			}
+			if (cityRole) {
+				try {
+					await member.roles.add(cityRole);
+				} catch (roleErr) {
+					console.error(`[MERGE] Failed to assign city role (${city}):`, roleErr.message);
+					roleAssigned = false;
+				}
 			}
 
 			// 3. Update Notion
@@ -113,10 +134,22 @@ module.exports = {
 			try {
 				const announcementChannel = await guild.channels.fetch('1490415427409412376');
 				if (announcementChannel) {
-					await announcementChannel.send(`**Bits&Bytes ${city}** is now live! Led by <@${user.id}>`);
+					const capitalizedCity = city.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+					await announcementChannel.send(`**Bits&Bytes ${capitalizedCity}** is now live! Led by <@${user.id}>`);
 				}
 			} catch (error) {
 				console.warn('[MERGE] Could not send announcement:', error.message);
+			}
+
+			// 5. Trigger self-healing permissions sync immediately
+			try {
+				const { syncForkPermissions } = require('../lib/channelSync');
+				const updatedFork = await notion.findForkByCity(city);
+				if (updatedFork) {
+					await syncForkPermissions(guild.client, updatedFork);
+				}
+			} catch (syncErr) {
+				console.warn('[MERGE] Permission sync fail:', syncErr.message);
 			}
 
 		} catch (error) {

@@ -11,6 +11,8 @@ const db = new sqlite3.Database(dbPath);
 jest.mock('../lib/notion', () => ({
 	findForkByCity: jest.fn(),
 	updateForkStatus: jest.fn(),
+	getLeadDiscordId: jest.fn().mockImplementation(fork => fork?.properties?.['Discord ID']?.rich_text?.[0]?.text?.content || null),
+	getCityName: jest.fn().mockImplementation(fork => fork?.properties?.['What city are you in?']?.rich_text?.[0]?.text?.content || fork?.properties?.City?.rich_text?.[0]?.text?.content || null),
 }));
 
 // Mock config
