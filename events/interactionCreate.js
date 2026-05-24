@@ -64,6 +64,18 @@ module.exports = {
 			}
 		} else if (interaction.isModalSubmit()) {
 			// Handle Modal Submissions if any (future use)
+		} else if (interaction.isButton()) {
+			if (interaction.customId === 'refresh_forks_info') {
+				const command = interaction.client.commands.get('forks-info');
+				if (command && typeof command.handleButton === 'function') {
+					try {
+						await command.handleButton(interaction);
+					} catch (error) {
+						console.error('[BUTTON_ERROR] Failed to handle refresh button:', error);
+						await interaction.reply({ content: `❌ Failed to refresh topology data: ${error.message}`, flags: [MessageFlags.Ephemeral] }).catch(() => null);
+					}
+				}
+			}
 		}
 	},
 };

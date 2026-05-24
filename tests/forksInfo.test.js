@@ -2,7 +2,7 @@
  * Unit tests for commands/forks-info.js
  */
 
-const { execute } = require('../commands/forks-info');
+const { execute, handleButton } = require('../commands/forks-info');
 const notion = require('../lib/notion');
 const auth = require('../lib/auth');
 const db = require('../lib/db');
@@ -56,6 +56,7 @@ describe('Forks Info Command Tests', () => {
 			members: {
 				fetch: jest.fn().mockResolvedValue({}),
 			},
+			iconURL: jest.fn().mockReturnValue('https://discord.com/icon.png'),
 		};
 
 		mockInteraction = {
@@ -66,6 +67,9 @@ describe('Forks Info Command Tests', () => {
 			reply: jest.fn().mockResolvedValue(true),
 			deferReply: jest.fn().mockResolvedValue(true),
 			editReply: jest.fn().mockResolvedValue(true),
+			deferUpdate: jest.fn().mockResolvedValue(true),
+			followUp: jest.fn().mockResolvedValue(true),
+			message: mockMessage,
 		};
 	});
 
@@ -106,7 +110,7 @@ describe('Forks Info Command Tests', () => {
 			expect.arrayContaining([expect.stringContaining('fork_info_msg')])
 		);
 		expect(mockInteraction.editReply).toHaveBeenCalledWith(expect.objectContaining({
-			content: expect.stringContaining('New fork info message posted'),
+			content: expect.stringContaining('New fork info dashboard posted'),
 		}));
 	});
 
@@ -134,7 +138,40 @@ describe('Forks Info Command Tests', () => {
 		expect(mockInteraction.deferReply).toHaveBeenCalled();
 		expect(mockMessage.edit).toHaveBeenCalled();
 		expect(mockInteraction.editReply).toHaveBeenCalledWith(expect.objectContaining({
-			content: expect.stringContaining('Existing fork info message updated'),
+			content: expect.stringContaining('Existing fork info dashboard updated'),
+		}));
+	});
+
+	test('should handle refresh button click', async () => {
+		auth.isStaff.mockReturnValue(true);
+		notion.getForks.mockResolvedValue([
+			{
+				id: 'fork1',
+				properties: {
+					'What city are you in?': { rich_text: [{ text: { content: 'Delhi' } }] },
+					'Status': { select: { name: 'Active' } },
+					'Health Score': { number: 85 },
+					'Points': { number: 150 },
+				},
+			},
+		]);
+		notion.getLeadDiscordId.mockReturnValue('lead_123');
+		notion.getTeamMembers.mockResolvedValue([]);
+
+		await handleButton(mockInteraction);
+
+		expect(mockInteraction.deferUpdate).toHaveBeenCalled();
+		expect(mockMessage.edit).toHaveBeenCalled();
+	});
+
+	test('should deny button refresh if member is not staff', async () => {
+		auth.isStaff.mockReturnValue(false);
+
+		await handleButton(mockInteraction);
+
+		expect(mockInteraction.reply).toHaveBeenCalledWith(expect.objectContaining({
+			flags: [MessageFlags.Ephemeral],
+			content: expect.stringContaining('permission'),
 		}));
 	});
 });
