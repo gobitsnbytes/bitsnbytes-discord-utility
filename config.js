@@ -4,45 +4,44 @@
  */
 
 module.exports = {
-	// 🎨 TACTICAL PALETTE (Elite Tech Aesthetic)
+	// 🎨 TACTICAL PALETTE (Elite Tech Aesthetic - Clean & Professional)
 	COLORS: {
-		primary: '#00F2FF',    // Atomic Cyan
-		secondary: '#1A1A1A',  // Deep Space Charcoal
-		success: '#00FF95',    // Matrix Green
-		warning: '#FFCC00',    // Alert Amber
-		error: '#FF0055',      // Protocol Breach Red
-		neutral: '#555555',    // Slate Grey
+		primary: '#00D2C4',    // Sleek Cyan
+		secondary: '#2B2D31',  // Premium Dark Charcoal
+		success: '#23A55A',    // Modern Emerald/Mint
+		warning: '#F0B232',    // Warm Amber Gold
+		error: '#F23F43',      // Premium Soft Crimson Red
+		neutral: '#80848E',    // Soft Slate Grey
 	},
 
-	// ⚛️ TACTICAL ICONOGRAPHY
+	// ⚛️ TACTICAL ICONOGRAPHY (Clean & Minimalist)
 	EMOJIS: {
-		protocol: '⚛️',         // Protocol Core
-		node: '⌬',             // Hex Node
-		active: '○',           // Signal Strength - High
-		pending: '●',          // Signal Strength - Initializing
-		archived: '🗃️',         // Data Vault
-		pulse: '⌁',            // Bio-Pulse / Signal
-		save: '⬢',             // Storage / Request
-		help: '⚙️',             // System Config
-		link: '↗️',            // External Link
-		// New emojis for extended features
-		success: '✅',          // Success indicator
-		warning: '⚠️',          // Warning indicator
-		error: '❌',            // Error indicator
-		health: '📊',           // Health/Analytics
-		team: '👥',             // Team
-		event: '📅',            // Events
-		report: '📝',           // Reports
-		badge: '🏅',            // Badges/Achievements
-		reminder: '🔔',         // Reminders
-		onboarding: '📋',       // Onboarding
-		leaderboard: '🏆',      // Leaderboard
-		points: '⭐',           // Points
-		calendar: '📆',         // Calendar
-		city: '🏙️',             // City/Location
-		github: '🐙',           // GitHub
-		website: '🌐',          // Website
-		partnership: '🤝',      // Partnership
+		protocol: '',          // Clean / No emoji
+		node: '▪',             // Clean square bullet
+		active: '🟢',          // Simple status dot
+		pending: '🟡',         // Simple status dot
+		archived: '📦',        // Archive box
+		pulse: '⚡',           // Pulse/Activity
+		save: '💾',            // Save
+		help: '❓',            // Help
+		link: '🔗',           // Link
+		success: '🟢',         // Success
+		warning: '🟡',         // Warning
+		error: '🔴',           // Error
+		health: '📈',          // Health
+		team: '👥',            // Team
+		event: '📅',           // Event
+		report: '📝',          // Report
+		badge: '🏆',           // Badge
+		reminder: '🔔',        // Reminder
+		onboarding: '📋',      // Onboarding
+		leaderboard: '🏆',     // Leaderboard
+		points: '⭐',          // Points
+		calendar: '📅',        // Calendar
+		city: '📍',            // City
+		github: '💻',          // GitHub
+		website: '🌐',         // Website
+		partnership: '🤝',     // Partnership
 	},
 
 	// 📄 PROTOCOL BRANDING
