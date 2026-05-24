@@ -151,7 +151,7 @@ module.exports = {
 				const announcementChannel = await guild.channels.fetch('1490415427409412376');
 				if (announcementChannel) {
 					const capitalizedCity = city.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
-					await announcementChannel.send(`**Bits&Bytes ${capitalizedCity}** is now live! Force-onboarded lead: <@${user.id}>`);
+					await announcementChannel.send(`**Bits&Bytes ${capitalizedCity}** is now live! Appointed lead: <@${user.id}> 🎉`);
 				}
 			} catch (error) {
 				console.warn('[ADMIN_ADD_LEAD] Announcement fail:', error.message);
