@@ -311,42 +311,26 @@ function startWebServer(client) {
         }
     });
 
+    // Helper to pick the right Cal.com event type ID based on meeting duration
+    function getCalcomEventTypeId(duration) {
+        const d = parseInt(duration, 10);
+        if (d <= 15) return process.env.CALCOM_EVENT_TYPE_15 || null;
+        if (d <= 30) return process.env.CALCOM_EVENT_TYPE_30 || null;
+        return process.env.CALCOM_EVENT_TYPE_45 || null;
+    }
+
     // Helper to calculate free slots in UTC for a single host
+    // NOTE: Always uses local DB — never Cal.com slots API.
+    // Reason: We share one central Google Calendar across all members/forks.
+    // Using Cal.com slots would mark a time as "busy" org-wide the moment
+    // anyone books it, preventing two different people from having parallel
+    // meetings at the same time. Per-person local DB avoids this.
     async function getHostFreeSlotsUTC(host, dateStr, duration, primaryTimeZone) {
         const offset = OFFSETS[primaryTimeZone] || '+05:30';
         const localStartISO = `${dateStr}T00:00:00${offset}`;
         const localEndISO = `${dateStr}T23:59:59${offset}`;
         const startUTC = new Date(localStartISO).toISOString();
         const endUTC = new Date(localEndISO).toISOString();
-
-        if (host.calcom_event_type_id && process.env.CALCOM_API_KEY) {
-            try {
-                const calcom = require('./lib/calcom');
-                const slotsData = await calcom.getSlots(host.calcom_event_type_id, startUTC, endUTC, duration);
-                const slotsMap = slotsData.slots || slotsData;
-                const utcSlots = [];
-
-                let slotsArray = [];
-                if (Array.isArray(slotsMap)) {
-                    slotsArray = slotsMap;
-                } else if (slotsMap && typeof slotsMap === 'object') {
-                    for (const dKey in slotsMap) {
-                        if (Array.isArray(slotsMap[dKey])) {
-                            slotsArray.push(...slotsMap[dKey]);
-                        }
-                    }
-                }
-
-                for (const s of slotsArray) {
-                    if (s.time || s.start) {
-                        utcSlots.push(new Date(s.time || s.start).toISOString());
-                    }
-                }
-                return utcSlots;
-            } catch (calcomErr) {
-                console.error(`[CALCOM] Slots fetch failed for host ${host.username}:`, calcomErr.message);
-            }
-        }
 
         // Local DB calculation
         const hostOffset = OFFSETS[host.timezone] || '+05:30';
@@ -543,35 +527,44 @@ function startWebServer(client) {
             // Create the meeting record
             const id = `meet_calweb_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
             
-            // Push booking to Cal.com for the primary host if configured
+            // Push booking to Cal.com using duration-based event type routing.
+            // This creates a Google Calendar event for visibility without
+            // affecting anyone else's availability (per-person local DB is used
+            // for slot checking, not the shared calendar).
             let calcomBookingId = null;
-            if (primaryHost.calcom_event_type_id && process.env.CALCOM_API_KEY) {
+            const calcomEventTypeId = getCalcomEventTypeId(duration);
+            if (calcomEventTypeId && process.env.CALCOM_API_KEY) {
                 try {
                     const calcom = require('./lib/calcom');
+                    // Build guest list: all additional hosts + booker
+                    const guestEmails = allHosts
+                        .filter(h => h.discord_id !== primaryHost.discord_id && h.email)
+                        .map(h => h.email);
                     const bookingBody = {
-                        eventTypeId: parseInt(primaryHost.calcom_event_type_id, 10),
+                        eventTypeId: parseInt(calcomEventTypeId, 10),
                         start: new Date(startTimeMs).toISOString(),
-                        end: new Date(endTimeMs).toISOString(),
                         timeZone: primaryHost.timezone || 'Asia/Kolkata',
                         language: 'en',
-                        metadata: {
-                            discord_meeting_id: id
-                        },
+                        metadata: { discord_meeting_id: id },
                         attendee: {
                             name: name,
                             email: email.trim().toLowerCase(),
                             timeZone: primaryHost.timezone || 'Asia/Kolkata'
                         },
+                        ...(guestEmails.length > 0 && {
+                            guests: guestEmails
+                        }),
                         bookingFieldsResponses: {
-                            notes: notes || description || ''
+                            notes: [notes, description].filter(Boolean).join('\n\n') || ''
                         }
                     };
                     const bookingResponse = await calcom.createBooking(bookingBody);
                     if (bookingResponse && (bookingResponse.uid || bookingResponse.id)) {
                         calcomBookingId = String(bookingResponse.uid || bookingResponse.id);
+                        console.log(`[CALCOM] Booking created: ${calcomBookingId} (${duration}min event type ${calcomEventTypeId})`);
                     }
                 } catch (calcomErr) {
-                    console.warn('[CALCOM] Web booking sync failed:', calcomErr.message);
+                    console.warn('[CALCOM] Web booking sync failed (non-fatal):', calcomErr.message);
                 }
             }
 

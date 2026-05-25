@@ -484,30 +484,112 @@ select.form-control {
 }
 
 /* Availability setup in dashboard */
+.availability-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.avail-action-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted-foreground);
+    padding: 0.3rem 0.8rem;
+    border-radius: var(--radius);
+    font-size: 0.775rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: var(--font-sans);
+}
+
+.avail-action-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(255,255,255,0.04);
+}
+
 .day-availability-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem 0;
-    border-bottom: 1px solid var(--border);
-    gap: 1.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius);
+    gap: 1rem;
+    transition: background 0.15s ease;
+    margin-bottom: 0.35rem;
+    border: 1px solid transparent;
+}
+
+.day-availability-row:hover {
+    background: rgba(255, 255, 255, 0.02);
+    border-color: var(--border);
+}
+
+.day-availability-row.day-disabled {
+    opacity: 0.35;
+}
+
+.day-availability-row.day-disabled .time-slots-inputs {
+    pointer-events: none;
 }
 
 .day-info {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.85rem;
     min-width: 130px;
 }
 
-.day-checkbox {
-    width: 18px;
-    height: 18px;
-    accent-color: var(--primary);
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.toggle-slider {
+    position: absolute;
     cursor: pointer;
-    background-color: #09090b;
+    inset: 0;
+    background-color: #27272a;
+    border-radius: 20px;
+    transition: 0.2s ease;
     border: 1px solid var(--border);
-    border-radius: 4px;
+}
+
+.toggle-slider:before {
+    content: '';
+    position: absolute;
+    height: 12px;
+    width: 12px;
+    left: 3px;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: #52525b;
+    border-radius: 50%;
+    transition: 0.2s ease;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: var(--primary);
+    border-color: var(--primary);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    background-color: var(--primary-foreground);
+    left: calc(100% - 15px);
 }
 
 .time-slots-inputs {
@@ -519,19 +601,53 @@ select.form-control {
 }
 
 .time-input {
-    width: 100px;
-    padding: 0.45rem 0.5rem;
+    width: 90px;
+    padding: 0.4rem 0.5rem;
     background: rgba(9, 9, 11, 0.8);
     border: 1px solid var(--border);
     color: var(--primary);
     border-radius: var(--radius);
     text-align: center;
     font-size: 0.8125rem;
+    font-family: var(--font-sans);
+    transition: border-color 0.15s ease;
+}
+
+.time-input:focus {
+    outline: none;
+    border-color: #52525b;
 }
 
 .time-input:disabled {
-    opacity: 0.25;
+    opacity: 0.3;
     cursor: not-allowed;
+}
+
+.copy-row-btn {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--muted-foreground);
+    padding: 0.3rem 0.5rem;
+    border-radius: var(--radius);
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+    font-family: var(--font-sans);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.day-availability-row:hover .copy-row-btn:not(:disabled) {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.copy-row-btn:hover {
+    color: var(--primary);
+    border-color: var(--border);
+    background: rgba(255,255,255,0.04);
 }
 
 footer {

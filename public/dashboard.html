@@ -156,14 +156,12 @@
                         </select>
                     </div>
 
-                    <div class="form-group">
-                        <label for="calcom-event-type">Cal.com Event Type (for Google Calendar & Cal.com Sync)</label>
-                        <select id="calcom-event-type" class="form-control">
-                            <option value="">-- No Integration (Local Database Only) --</option>
-                        </select>
-                        <span style="font-size: 0.75rem; color: var(--muted-foreground); display: block; margin-top: 0.35rem;">
-                            Select the Cal.com event type mapping to your account. Future portal bookings will write to your Cal.com and Google Calendar, and availability will check Google Calendar.
-                        </span>
+                    <div class="form-group" style="background: rgba(252,146,13,0.07); border: 1px solid rgba(252,146,13,0.25); border-radius: var(--radius); padding: 0.85rem 1rem; display: flex; align-items: flex-start; gap: 0.6rem;">
+                        <span style="font-size: 1rem; margin-top: 0.05rem;">📅</span>
+                        <div>
+                            <span style="font-size: 0.8125rem; font-weight: 600; color: #fc920d;">Google Calendar sync is automatic</span>
+                            <span style="font-size: 0.775rem; color: var(--muted-foreground); display: block; margin-top: 0.2rem;">Every booking made through your link is automatically pushed to the BnB Google Calendar via Cal.com — no extra setup needed. Meeting duration determines the event type used.</span>
+                        </div>
                     </div>
 
                     <h3 style="margin: 3rem 0 1rem 0; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">Weekly Availability Hours</h3>
@@ -187,28 +185,7 @@
     <script>
         const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         
-        async function loadCalcomEventTypes(selectedId) {
-            const dropdown = document.getElementById('calcom-event-type');
-            try {
-                const res = await fetch('/api/calcom/event-types');
-                if (res.ok) {
-                    const eventTypes = await res.json();
-                    dropdown.innerHTML = '<option value="">-- No Integration (Local Database Only) --</option>';
-                    eventTypes.forEach(et => {
-                        const opt = document.createElement('option');
-                        opt.value = et.id;
-                        opt.textContent = `${et.title} (${et.lengthInMinutes || et.length || '30'} mins) - slug: ${et.slug}`;
-                        if (String(et.id) === String(selectedId)) {
-                            opt.selected = true;
-                        }
-                        dropdown.appendChild(opt);
-                    });
-                }
-            } catch (err) {
-                console.error('Failed to load Cal.com event types:', err);
-            }
-        }
-        
+
         // Render empty day rows
         const daysContainer = document.getElementById('days-container');
         days.forEach(day => {
@@ -299,9 +276,6 @@
                     document.getElementById('associated-fork-container').style.display = 'none';
                 }
 
-                // Set calcom event type
-                await loadCalcomEventTypes(user.calcom_event_type_id);
-                
                 // Set availability hours
                 if (user.weekly_hours) {
                     const hours = JSON.parse(user.weekly_hours);
@@ -328,7 +302,7 @@
             const bookingLink = document.getElementById('booking-link').value.trim();
             const description = document.getElementById('description').value.trim();
             const timezone = document.getElementById('timezone').value;
-            const calcom_event_type_id = document.getElementById('calcom-event-type').value;
+            
             
             // Build availability JSON
             const weekly_hours = {};
@@ -352,8 +326,7 @@
                         booking_link: bookingLink,
                         description,
                         timezone,
-                        weekly_hours: JSON.stringify(weekly_hours),
-                        calcom_event_type_id: calcom_event_type_id || null
+                        weekly_hours: JSON.stringify(weekly_hours)
                     })
                 });
                 
