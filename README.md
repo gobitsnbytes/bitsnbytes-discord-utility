@@ -86,3 +86,11 @@ Set these GitHub secrets:
 | `/meet-schedule` | Everyone | Schedule a sync session with core team members |
 | `/meet-start` | Everyone | Manually start a scheduled voice meeting |
 | `/meet-transcript` | Everyone | Retrieve past meeting notes, summaries, and transcripts |
+
+## Web Scheduling Portal
+
+The bot hosts a web scheduling portal at `cal.gobnb.org` (or your configured `cal.gobitsnbytes.org` domain).
+- **Forced Guest Authentication:** All guests are required to authenticate with Discord before reserving a time slot.
+- **Auto-Join Server:** Upon successful authentication, guests are automatically joined to the Bits&Bytes Discord server using the `guilds.join` scope.
+- **Automatic VC Access:** The bot auto-provisions a private temporary voice channel for the meeting and sets explicit permission overrides to allow the guest to view and connect.
+- **DMs & Delivery:** The guest receives meeting alerts via Discord DM and is delivered the meeting brief/transcript directly in their DMs when the meeting concludes.

@@ -546,7 +546,8 @@ Exposes a web scheduling portal (`cal.gobnb.org`) for members to book sync sessi
    - Built with raw responsive HTML/JS and Svelte-like Vanilla CSS in `public/style.css`.
    - Supports display titles, custom bios, timezone configurations, and weekly availability selectors.
    - Provides a multi-host selection system (combining schedules for multiple leads) and custom meeting durations.
-   - Automatically pre-fills form data for logged-in Discord members and secures inputs against iOS Safari auto-zooming.
+   - Enforces Discord OAuth2 authentication for all guest bookings, automatically adding them to the server (via `guilds.join` scope), resolving their Discord IDs, and locking pre-filled details.
+   - Implements database-backed session cookie persistence (`web_sessions` table) to withstand bot restarts, along with Express `trust proxy` configuration and dynamic secure cookie handling for Nginx reverse proxies.
    - Implements direct "⚡ Request Instant Meet" buttons triggering direct Discord DMs with interactive Accept/Decline action controls.
 2. **Discord Voice Provisioning:**
    - Automatically provisions a temporary VC channel under the `EVENTS` category.
