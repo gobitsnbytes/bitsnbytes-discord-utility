@@ -133,6 +133,24 @@ function startWebServer(client) {
 
             const userData = await userResponse.json();
 
+            // Restriction check: Must belong to target guild 1480617556292272260 and hold the "contributor" role
+            try {
+                const targetGuildId = '1480617556292272260';
+                const targetGuild = client.guilds.cache.get(targetGuildId) || await client.guilds.fetch(targetGuildId).catch(() => null);
+                if (!targetGuild) {
+                    console.error(`[AUTH_ERROR] Target guild ${targetGuildId} could not be resolved.`);
+                    return res.status(500).send('Authentication failed: Target Discord server could not be resolved.');
+                }
+                const targetMember = await targetGuild.members.fetch(userData.id).catch(() => null);
+                const hasContributorRole = targetMember && targetMember.roles.cache.some(r => r.name.toLowerCase() === 'contributor');
+                if (!hasContributorRole) {
+                    return res.status(403).send('Authentication Denied: You must be a member of the Bits&Bytes Discord server and hold the "contributor" role to log in.');
+                }
+            } catch (authRestrictErr) {
+                console.error('[AUTH_RESTRICT_ERROR]', authRestrictErr);
+                return res.status(500).send('Authentication failed: Server check error.');
+            }
+
             // Resolve Discord city role
             let cityRoleName = null;
             let cityRoleId = null;
@@ -903,6 +921,60 @@ function startWebServer(client) {
         console.log(`[BOOT] Scheduler & Webhook server listening on port ${PORT}`);
         logger.boot(`Scheduler & Webhook server online on port ${PORT}`, null, false);
     });
+
+    if (client.isReady()) {
+        runUserCleanup(client);
+    } else {
+        client.once('ready', () => {
+            runUserCleanup(client);
+        });
+    }
+
+    setInterval(() => {
+        if (client.isReady()) {
+            runUserCleanup(client).catch(err => {
+                console.error('[CLEANUP_ERROR]', err);
+            });
+        }
+    }, 10 * 60 * 1000);
 }
 
-module.exports = { startWebServer };
+async function runUserCleanup(client) {
+    try {
+        const targetGuildId = '1480617556292272260';
+        const guild = client.guilds.cache.get(targetGuildId) || await client.guilds.fetch(targetGuildId).catch(() => null);
+        if (!guild) {
+            console.warn(`[CLEANUP] Target guild ${targetGuildId} not found.`);
+            return;
+        }
+
+        // Fetch members to ensure cache is populated
+        await guild.members.fetch().catch(err => {
+            console.warn(`[CLEANUP] Failed to fetch guild members:`, err.message);
+        });
+
+        const allUsers = await db.all('SELECT discord_id, username FROM user_availability');
+        for (const dbUser of allUsers) {
+            const member = guild.members.cache.get(dbUser.discord_id);
+            const hasRole = member && member.roles.cache.some(r => r.name.toLowerCase() === 'contributor');
+            if (!hasRole) {
+                console.log(`[CLEANUP] Removing user ${dbUser.username} (${dbUser.discord_id}) because they lack the contributor role.`);
+
+                // Log them out
+                for (const [sid, sess] of sessions.entries()) {
+                    if (sess.id === dbUser.discord_id) {
+                        sessions.delete(sid);
+                    }
+                }
+
+                // Delete from database
+                await db.run('DELETE FROM user_availability WHERE discord_id = ?', [dbUser.discord_id]);
+                await db.run('DELETE FROM meeting_email_preferences WHERE discord_id = ?', [dbUser.discord_id]);
+            }
+        }
+    } catch (err) {
+        console.error(`[CLEANUP] Error during user cleanup:`, err);
+    }
+}
+
+module.exports = { startWebServer, runUserCleanup, sessions };

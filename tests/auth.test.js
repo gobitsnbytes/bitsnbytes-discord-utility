@@ -243,3 +243,86 @@ describe('Auth Layer Tests', () => {
 		});
 	});
 });
+
+describe('User Availability Contributor Restriction & Cleanup', () => {
+	let mockClient;
+	let mockGuild;
+	const { runUserCleanup, sessions } = require('../server');
+	const db = require('../lib/db');
+
+	beforeEach(() => {
+		jest.clearAllMocks();
+
+		mockGuild = {
+			id: '1480617556292272260',
+			members: {
+				fetch: jest.fn().mockResolvedValue(true),
+				cache: {
+					get: jest.fn().mockImplementation((id) => {
+						if (id === 'user_contributor') {
+							return {
+								id: 'user_contributor',
+								roles: {
+									cache: {
+										some: (fn) => fn({ name: 'Contributor' })
+									}
+								}
+							};
+						}
+						if (id === 'user_stranger') {
+							return {
+								id: 'user_stranger',
+								roles: {
+									cache: {
+										some: (fn) => fn({ name: 'OtherRole' })
+									}
+								}
+							};
+						}
+						return null; // Left server / kicked
+					})
+				}
+			}
+		};
+
+		mockClient = {
+			guilds: {
+				cache: {
+					get: jest.fn().mockReturnValue(mockGuild)
+				}
+			}
+		};
+
+		jest.spyOn(db, 'all').mockResolvedValue([
+			{ discord_id: 'user_contributor', username: 'contrib' },
+			{ discord_id: 'user_stranger', username: 'strange' },
+			{ discord_id: 'user_left', username: 'left' }
+		]);
+		jest.spyOn(db, 'run').mockResolvedValue(true);
+	});
+
+	afterEach(() => {
+		jest.restoreAllMocks();
+	});
+
+	test('runUserCleanup should delete non-contributors and members who left, and clear their sessions', async () => {
+		// Setup mock sessions
+		sessions.clear();
+		sessions.set('sid_contrib', { id: 'user_contributor', username: 'contrib' });
+		sessions.set('sid_strange', { id: 'user_stranger', username: 'strange' });
+		sessions.set('sid_left', { id: 'user_left', username: 'left' });
+
+		await runUserCleanup(mockClient);
+
+		// Assert db.run was called to delete user_stranger and user_left
+		expect(db.run).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM user_availability'), ['user_stranger']);
+		expect(db.run).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM user_availability'), ['user_left']);
+		// Assert contributor user is NOT deleted
+		expect(db.run).not.toHaveBeenCalledWith(expect.stringContaining('DELETE FROM user_availability'), ['user_contributor']);
+
+		// Assert session cleanup
+		expect(sessions.has('sid_contrib')).toBe(true);
+		expect(sessions.has('sid_strange')).toBe(false);
+		expect(sessions.has('sid_left')).toBe(false);
+	});
+});
