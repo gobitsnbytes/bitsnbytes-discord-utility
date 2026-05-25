@@ -24,7 +24,7 @@ async function checkForks() {
         response.results.forEach((f, i) => {
             console.log(`\nFork ${i + 1}:`);
             console.log('Status:', JSON.stringify(f.properties.Status, null, 2));
-            console.log('City:', JSON.stringify(f.properties.City, null, 2));
+            console.log('City:', JSON.stringify(f.properties['What city are you in?'], null, 2));
             console.log('Discord ID:', JSON.stringify(f.properties['Discord ID'], null, 2));
         });
     } catch (error) {

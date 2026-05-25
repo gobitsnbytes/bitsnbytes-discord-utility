@@ -26,7 +26,7 @@ module.exports = {
 			const forks = await notion.getForks();
 			const forkMap = new Map();
 			for (const fork of forks) {
-				forkMap.set(fork.id, fork.properties.City?.rich_text?.[0]?.text?.content || 
+				forkMap.set(fork.id, fork.properties['What city are you in?']?.rich_text?.[0]?.text?.content || 
 				                      fork.properties['Fork Name']?.title?.[0]?.text?.content || 
 				                      'Unknown');
 			}

@@ -82,7 +82,7 @@ module.exports = {
 				for (const fork of activeForks) {
 					const status = await notion.getOnboardingStatus(fork.id);
 					if (!onboarding.isOnboardingComplete(status)) {
-						const city = fork.properties.City?.rich_text?.[0]?.text?.content || 
+						const city = fork.properties['What city are you in?']?.rich_text?.[0]?.text?.content || 
 						             fork.properties['Fork Name']?.title?.[0]?.text?.content || 
 						             'UNKNOWN';
 						forkStatuses.push({

@@ -27,7 +27,7 @@ module.exports = (client) => {
 			const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
 			for (const fork of activeForks) {
-				const city = fork.properties.City?.rich_text?.[0]?.text?.content || 
+				const city = fork.properties['What city are you in?']?.rich_text?.[0]?.text?.content || 
 				             fork.properties['Fork Name']?.title?.[0]?.text?.content || 
 				             'UNKNOWN';
 				const leadId = fork.properties['Discord ID']?.rich_text?.[0]?.text?.content;

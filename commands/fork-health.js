@@ -102,7 +102,7 @@ module.exports = {
 
 			// Top 10 forks
 			const leaderboardText = rankedForks.slice(0, 10).map((f, i) => {
-				const city = (f.fork.properties.City?.rich_text?.[0]?.text?.content || 
+				const city = (f.fork.properties['What city are you in?']?.rich_text?.[0]?.text?.content || 
 				              f.fork.properties['Fork Name']?.title?.[0]?.text?.content || 
 				              'UNKNOWN').toUpperCase();
 				const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
@@ -119,7 +119,7 @@ module.exports = {
 			const atRisk = healthScore.getAtRiskForks(rankedForks);
 			if (atRisk.length > 0) {
 				const atRiskText = atRisk.slice(0, 5).map(f => {
-					const city = (f.fork.properties.City?.rich_text?.[0]?.text?.content || 'UNKNOWN').toUpperCase();
+					const city = (f.fork.properties['What city are you in?']?.rich_text?.[0]?.text?.content || 'UNKNOWN').toUpperCase();
 					return `⚠️ ${city} (${f.healthScore}/100)`;
 				}).join('\n');
 

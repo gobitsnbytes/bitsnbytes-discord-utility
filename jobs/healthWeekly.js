@@ -30,7 +30,7 @@ module.exports = (client) => {
 			// Top 5 performers
 			if (topForks.length > 0) {
 				const topText = topForks.map((f, i) => {
-					const city = (f.fork.properties.City?.rich_text?.[0]?.text?.content || 
+					const city = (f.fork.properties['What city are you in?']?.rich_text?.[0]?.text?.content || 
 					              f.fork.properties['Fork Name']?.title?.[0]?.text?.content || 
 					              'UNKNOWN').toUpperCase();
 					const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
@@ -47,7 +47,7 @@ module.exports = (client) => {
 			// At-risk forks
 			if (atRiskForks.length > 0) {
 				const atRiskText = atRiskForks.slice(0, 5).map(f => {
-					const city = (f.fork.properties.City?.rich_text?.[0]?.text?.content || 
+					const city = (f.fork.properties['What city are you in?']?.rich_text?.[0]?.text?.content || 
 					              'UNKNOWN').toUpperCase();
 					const leadId = f.fork.properties['Discord ID']?.rich_text?.[0]?.text?.content;
 					const mention = leadId ? `<@${leadId}>` : 'No lead';

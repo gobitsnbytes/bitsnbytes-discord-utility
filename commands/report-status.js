@@ -99,7 +99,7 @@ module.exports = {
 
 				let statusText = '';
 				for (const fork of activeForks.slice(0, 10)) {
-					const forkCity = (fork.properties.City?.rich_text?.[0]?.text?.content || 
+					const forkCity = (fork.properties['What city are you in?']?.rich_text?.[0]?.text?.content || 
 					                  fork.properties['Fork Name']?.title?.[0]?.text?.content || 
 					                  'UNKNOWN').toUpperCase();
 					const reports = await notion.getReports(fork.id);

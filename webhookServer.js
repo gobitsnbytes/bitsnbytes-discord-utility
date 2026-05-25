@@ -29,10 +29,14 @@ function verifySignature(rawBody, signature) {
 		.createHmac('sha256', SECRET)
 		.update(rawBody)
 		.digest('hex');
-	return crypto.timingSafeEqual(
-		Buffer.from(`sha256=${expected}`, 'utf8'),
-		Buffer.from(signature, 'utf8')
-	);
+
+	const expectedBuffer = Buffer.from(`sha256=${expected}`, 'utf8');
+	const signatureBuffer = Buffer.from(signature, 'utf8');
+	
+	if (expectedBuffer.length !== signatureBuffer.length) {
+		return false;
+	}
+	return crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
 }
 
 /**
