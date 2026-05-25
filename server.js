@@ -72,7 +72,14 @@ function startWebServer(client) {
         if (!CLIENT_ID) {
             return res.send('OAuth Error: DISCORD_CLIENT_ID is not configured in .env');
         }
-        const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify+email`;
+        const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+        const host = req.get('host');
+        let redirectUri = process.env.REDIRECT_URI;
+        if (!redirectUri || !redirectUri.includes(host)) {
+            redirectUri = `${protocol}://${host}/auth/callback`;
+        }
+
+        const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify+email`;
         res.redirect(discordAuthUrl);
     });
 
@@ -83,6 +90,13 @@ function startWebServer(client) {
         }
 
         try {
+            const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+            const host = req.get('host');
+            let redirectUri = process.env.REDIRECT_URI;
+            if (!redirectUri || !redirectUri.includes(host)) {
+                redirectUri = `${protocol}://${host}/auth/callback`;
+            }
+
             // Exchange code for token
             const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
                 method: 'POST',
@@ -92,7 +106,7 @@ function startWebServer(client) {
                     client_secret: CLIENT_SECRET,
                     grant_type: 'authorization_code',
                     code,
-                    redirect_uri: REDIRECT_URI,
+                    redirect_uri: redirectUri,
                 }),
             });
 
@@ -178,7 +192,11 @@ function startWebServer(client) {
             }
 
             // Set cookie
-            res.cookie('session_id', sessionId, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
+            res.cookie('session_id', sessionId, { 
+                httpOnly: true, 
+                secure: process.env.NODE_ENV === 'production',
+                path: '/'
+            });
             res.redirect('/dashboard');
 
         } catch (error) {
@@ -192,7 +210,7 @@ function startWebServer(client) {
         if (sessionId) {
             sessions.delete(sessionId);
         }
-        res.clearCookie('session_id');
+        res.clearCookie('session_id', { path: '/' });
         res.redirect('/');
     });
 
