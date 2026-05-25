@@ -34,6 +34,9 @@ const OFFSETS = {
 function startWebServer(client) {
     const app = express();
 
+    // Trust reverse proxy (Nginx) to correctly determine HTTPS
+    app.set('trust proxy', 1);
+
     // Middleware
     app.use(cookieParser());
     
@@ -242,7 +245,8 @@ function startWebServer(client) {
             // Set cookie
             res.cookie('session_id', sessionId, { 
                 httpOnly: true, 
-                secure: process.env.NODE_ENV === 'production',
+                secure: req.secure || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
                 path: '/',
                 maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
             });
