@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard // Bits&Bytes Scheduler</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2.5rem;
+        }
+        @media(min-width: 900px) {
+            .dashboard-container {
+                grid-template-columns: 350px 1fr;
+            }
+        }
+        .profile-summary {
+            text-align: center;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 2rem;
+            margin-bottom: 2rem;
+        }
+        .profile-summary .user-avatar {
+            margin: 0 auto 1rem auto;
+            width: 80px;
+            height: 80px;
+            font-size: 2.2rem;
+        }
+        .alert-popup {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            display: none;
+            font-weight: 500;
+        }
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        .alert-error {
+            background: rgba(239, 109, 109, 0.1);
+            color: var(--error);
+            border: 1px solid rgba(239, 109, 109, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <span class="logo-icon">⚛️</span>
+            <span class="logo-text">bits&bytes // scheduler</span>
+        </div>
+        <div class="nav-links">
+            <a href="/" class="btn btn-secondary">Home</a>
+            <a href="/logout" class="btn btn-danger">Logout</a>
+        </div>
+    </header>
+
+    <main>
+        <div class="alert-popup" id="alert-message"></div>
+
+        <div class="dashboard-container">
+            <!-- Sidebar: User profile Info -->
+            <div class="glass-card" style="height: fit-content;">
+                <div class="profile-summary">
+                    <div class="user-avatar" id="sidebar-avatar">?</div>
+                    <h2 id="sidebar-username">Loading...</h2>
+                    <p id="sidebar-email" style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">loading email...</p>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">PUBLIC BOOKING URL</span>
+                        <a href="#" id="public-booking-url" target="_blank" style="color: var(--secondary); font-weight: 600; text-decoration: none; font-size: 0.95rem; word-break: break-all;">Configure link first</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Panel: Configuration Form -->
+            <div class="glass-card">
+                <h2>Configure Availability & Booking Info</h2>
+                <p class="subtitle" style="margin-bottom: 2rem;">Setup your bio and operational timeslots. These rules determine when guests are allowed to book syncs with you.</p>
+
+                <form id="availability-form">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                        <div class="form-group">
+                            <label for="title">Display Title</label>
+                            <input type="text" id="title" class="form-control" placeholder="e.g. Akshat Kapoor (Tech Coordinator)" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="booking-link">Booking Handle (Link URL)</label>
+                            <input type="text" id="booking-link" class="form-control" placeholder="e.g. akshat" pattern="^[a-zA-Z0-9-_]+$" title="Only letters, numbers, hyphens, and underscores allowed" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="description">Short Bio / Booking Intro</label>
+                        <textarea id="description" class="form-control" placeholder="Tell visitors what they can expect from booking a meeting with you..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="timezone">Timezone</label>
+                        <select id="timezone" class="form-control">
+                            <option value="Asia/Kolkata">Asia/Kolkata (IST - UTC+5:30)</option>
+                            <option value="UTC">UTC (Coordinated Universal Time)</option>
+                            <option value="America/New_York">America/New_York (EST/EDT)</option>
+                            <option value="Europe/London">Europe/London (GMT/BST)</option>
+                            <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
+                        </select>
+                    </div>
+
+                    <h3 style="margin: 2.5rem 0 1rem 0; border-bottom: 1px solid var(--card-border); padding-bottom: 0.5rem;">Weekly Availability Hours</h3>
+
+                    <div id="days-container">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <div style="margin-top: 2rem; display: flex; justify-content: flex-end;">
+                        <button type="submit" class="btn btn-primary" style="padding: 0.8rem 2rem;">Save Configuration</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>© 2026 Bits&Bytes Network. Powered by Discord Voice Infrastructure.</p>
+    </footer>
+
+    <script>
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        
+        // Render empty day rows
+        const daysContainer = document.getElementById('days-container');
+        days.forEach(day => {
+            const dayCap = day.charAt(0).toUpperCase() + day.slice(1);
+            const row = document.createElement('div');
+            row.className = 'day-availability-row';
+            row.innerHTML = `
+                <div class="day-info">
+                    <input type="checkbox" id="check-${day}" class="day-checkbox">
+                    <label for="check-${day}" style="font-weight: 600; cursor: pointer;">${dayCap}</label>
+                </div>
+                <div class="time-slots-inputs">
+                    <input type="time" id="start-${day}" class="time-input" value="09:00" disabled>
+                    <span style="color: var(--text-muted)">to</span>
+                    <input type="time" id="end-${day}" class="time-input" value="17:00" disabled>
+                </div>
+            `;
+            daysContainer.appendChild(row);
+            
+            // Enable/disable time inputs based on checkbox
+            const checkbox = document.getElementById(`check-${day}`);
+            const startInput = document.getElementById(`start-${day}`);
+            const endInput = document.getElementById(`end-${day}`);
+            
+            checkbox.addEventListener('change', () => {
+                startInput.disabled = !checkbox.checked;
+                endInput.disabled = !checkbox.checked;
+            });
+        });
+
+        function showAlert(msg, type = 'success') {
+            const alert = document.getElementById('alert-message');
+            alert.textContent = msg;
+            alert.className = `alert-popup alert-${type}`;
+            alert.style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+
+        async function loadProfile() {
+            try {
+                const res = await fetch('/api/user/me');
+                if (!res.ok) {
+                    window.location.href = '/';
+                    return;
+                }
+                
+                const user = await res.json();
+                
+                // Sidebar details
+                document.getElementById('sidebar-username').textContent = user.username;
+                document.getElementById('sidebar-email').textContent = user.email || 'No email registered';
+                document.getElementById('sidebar-avatar').textContent = user.username.charAt(0).toUpperCase();
+                
+                // Form values
+                document.getElementById('title').value = user.title || user.username;
+                document.getElementById('booking-link').value = user.booking_link || '';
+                document.getElementById('description').value = user.description || '';
+                if (user.timezone) {
+                    document.getElementById('timezone').value = user.timezone;
+                }
+                
+                if (user.booking_link) {
+                    const link = document.getElementById('public-booking-url');
+                    link.href = `/${user.booking_link}`;
+                    link.textContent = `${window.location.origin}/${user.booking_link}`;
+                }
+                
+                // Set availability hours
+                if (user.weekly_hours) {
+                    const hours = JSON.parse(user.weekly_hours);
+                    days.forEach(day => {
+                        if (hours[day] && hours[day].length > 0) {
+                            document.getElementById(`check-${day}`).checked = true;
+                            document.getElementById(`start-${day}`).disabled = false;
+                            document.getElementById(`end-${day}`).disabled = false;
+                            document.getElementById(`start-${day}`).value = hours[day][0].start;
+                            document.getElementById(`end-${day}`).value = hours[day][0].end;
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to load user profile:', err);
+                showAlert('Error loading profile. Check backend connection.', 'error');
+            }
+        }
+
+        document.getElementById('availability-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const title = document.getElementById('title').value.trim();
+            const bookingLink = document.getElementById('booking-link').value.trim();
+            const description = document.getElementById('description').value.trim();
+            const timezone = document.getElementById('timezone').value;
+            
+            // Build availability JSON
+            const weekly_hours = {};
+            days.forEach(day => {
+                const checked = document.getElementById(`check-${day}`).checked;
+                if (checked) {
+                    const start = document.getElementById(`start-${day}`).value;
+                    const end = document.getElementById(`end-${day}`).value;
+                    weekly_hours[day] = [{ start, end }];
+                } else {
+                    weekly_hours[day] = [];
+                }
+            });
+            
+            try {
+                const res = await fetch('/api/user/availability', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title,
+                        booking_link: bookingLink,
+                        description,
+                        timezone,
+                        weekly_hours: JSON.stringify(weekly_hours)
+                    })
+                });
+                
+                if (res.ok) {
+                    showAlert('Availability and profile successfully updated!');
+                    // Refresh link
+                    const link = document.getElementById('public-booking-url');
+                    link.href = `/${bookingLink}`;
+                    link.textContent = `${window.location.origin}/${bookingLink}`;
+                } else {
+                    const err = await res.json();
+                    showAlert(err.error || 'Failed to update configuration', 'error');
+                }
+            } catch (err) {
+                console.error('Failed to submit:', err);
+                showAlert('Network error while updating configuration', 'error');
+            }
+        });
+
+        loadProfile();
+    </script>
+</body>
+</html>

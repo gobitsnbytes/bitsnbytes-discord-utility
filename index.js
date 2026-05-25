@@ -138,13 +138,13 @@ safeStartJob('./jobs/notionProfileCheck', client, 'notionProfileCheck');
 
 console.log('[BOOT] Job initialization complete.');
 
-// Start webhook server if secret or port is configured
+// Start unified scheduling and webhook server
 if (process.env.CALCOM_WEBHOOK_SECRET || process.env.WEBHOOK_PORT) {
 	try {
-		const { startWebhookServer } = require('./webhookServer');
-		startWebhookServer(client);
-	} catch (webhookErr) {
-		logger.error('Failed to initialize Webhook server', webhookErr);
+		const { startWebServer } = require('./server');
+		startWebServer(client);
+	} catch (webErr) {
+		logger.error('Failed to initialize Web Server', webErr);
 	}
 }
 

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bits&Bytes Scheduler // Network Sync Portal</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <span class="logo-icon">⚛️</span>
+            <span class="logo-text">bits&bytes // scheduler</span>
+        </div>
+        <div class="nav-links" id="nav-links">
+            <a href="/login" class="btn btn-primary" id="login-btn">
+                <span>Login with Discord</span>
+            </a>
+        </div>
+    </header>
+
+    <main>
+        <div class="glass-card" style="margin-bottom: 3rem; text-align: center;">
+            <h1>Schedule a Meeting with Our Team</h1>
+            <p class="subtitle" style="margin-bottom: 0;">Select a member of the Bits&Bytes core team below to book a sync. Meetings are hosted on our official Discord conferencing infrastructure with automated VC provisioning and transcripts.</p>
+        </div>
+
+        <div class="users-grid" id="hosts-grid">
+            <!-- Dynamically populated -->
+            <div class="empty-state" id="loading-indicator">
+                <div class="empty-icon">⏳</div>
+                p Loading available team members...
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>© 2026 Bits&Bytes Network. Powered by Discord Voice Infrastructure.</p>
+    </footer>
+
+    <script>
+        async function loadHosts() {
+            try {
+                const res = await fetch('/api/users');
+                const users = await res.json();
+                
+                const grid = document.getElementById('hosts-grid');
+                grid.innerHTML = '';
+                
+                if (users.length === 0) {
+                    grid.innerHTML = `
+                        <div class="empty-state" style="grid-column: 1 / -1;">
+                            <div class="empty-icon">📭</div>
+                            <h2>No team members registered yet</h2>
+                            <p class="subtitle" style="margin-top: 0.5rem;">If you are a team member, log in using the button above to configure your availability.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                users.forEach(user => {
+                    const avatarLetter = user.title ? user.title.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase();
+                    const card = document.createElement('div');
+                    card.className = 'glass-card user-card';
+                    card.innerHTML = `
+                        <div>
+                            <div class="user-card-header">
+                                <div class="user-avatar">${avatarLetter}</div>
+                                <div class="user-meta">
+                                    <h3>${user.title || user.username}</h3>
+                                    <span>@${user.booking_link}</span>
+                                </div>
+                            </div>
+                            <div class="user-card-body">
+                                ${user.description || 'Core team member at Bits&Bytes. Book a session to sync on projects, events, or operations.'}
+                            </div>
+                        </div>
+                        <div class="user-card-footer">
+                            <span class="timezone-badge">🌐 ${user.timezone}</span>
+                            <a href="/${user.booking_link}" class="btn btn-primary" style="padding: 0.4rem 1rem; font-size: 0.85rem;">Book Session</a>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch (err) {
+                console.error('Failed to load hosts:', err);
+                document.getElementById('hosts-grid').innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1; color: var(--error);">
+                        <div class="empty-icon">⚠️</div>
+                        <h2>Failed to connect to scheduler API</h2>
+                        <p class="subtitle" style="margin-top: 0.5rem;">Please check server logs or retry later.</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function checkLogin() {
+            try {
+                const res = await fetch('/api/user/me');
+                if (res.ok) {
+                    const user = await res.json();
+                    const nav = document.getElementById('nav-links');
+                    nav.innerHTML = `
+                        <a href="/dashboard" class="btn btn-secondary">
+                            <span>Control Dashboard</span>
+                        </a>
+                        <a href="/logout" class="btn btn-danger">
+                            <span>Logout</span>
+                        </a>
+                    `;
+                }
+            } catch (err) {
+                console.warn('OAuth check failed:', err);
+            }
+        }
+
+        checkLogin();
+        loadHosts();
+    </script>
+</body>
+</html>

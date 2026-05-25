@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Sync // Bits&Bytes Scheduler</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .month-name {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+        .nav-arrow {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.8rem;
+        }
+        .nav-arrow:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(8px);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            width: 100%;
+            max-width: 500px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <span class="logo-icon">⚛️</span>
+            <span class="logo-text">bits&bytes // scheduler</span>
+        </div>
+        <div class="nav-links">
+            <a href="/" class="btn btn-secondary">Home</a>
+        </div>
+    </header>
+
+    <main>
+        <div id="booking-flow" class="booking-container">
+            <!-- Sidebar: Host Bio -->
+            <div class="host-sidebar" id="host-sidebar">
+                <div class="user-avatar" style="width:70px; height:70px; font-size:1.8rem; margin-bottom: 1.5rem;" id="host-avatar">?</div>
+                <h2 id="host-name" style="margin-bottom: 0.25rem;">Loading host...</h2>
+                <span id="host-title" style="color: var(--secondary); font-weight: 500; display: block; margin-bottom: 1.5rem; font-size: 0.95rem;">Core Member</span>
+                <p id="host-description" style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.6; margin-bottom: 2rem;">Loading details...</p>
+                <div class="timezone-badge" style="font-size: 0.9rem;">
+                    <span>🌐 Timezone: </span><strong id="host-timezone">Asia/Kolkata</strong>
+                </div>
+            </div>
+
+            <!-- Calendar slot selector -->
+            <div class="glass-card">
+                <div class="calendar-wrapper">
+                    <div class="calendar-header">
+                        <div class="nav-arrow" id="prev-month">◀</div>
+                        <div class="month-name" id="month-display">May 2026</div>
+                        <div class="nav-arrow" id="next-month">▶</div>
+                    </div>
+                    
+                    <div class="calendar-grid" id="calendar-grid">
+                        <!-- Days populates by JS -->
+                    </div>
+                </div>
+
+                <div class="slots-container" id="slots-section" style="display: none;">
+                    <h3 style="border-top: 1px solid var(--card-border); padding-top: 1.5rem; margin-top: 1.5rem;" id="selected-date-heading">Select a Time Slot</h3>
+                    <div class="slots-grid" id="slots-grid">
+                        <!-- Slots populates by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Booking details Modal -->
+        <div class="modal" id="booking-modal">
+            <div class="glass-card modal-content">
+                <h3 style="margin-bottom: 1.5rem;">Confirm Meeting Details</h3>
+                <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--card-border); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
+                    <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.25rem;">Selected Date & Time:</p>
+                    <p id="selected-datetime-label" style="font-weight: 600; color: var(--secondary);"></p>
+                </div>
+                
+                <form id="booking-form">
+                    <div class="form-group">
+                        <label for="guest-name">Your Full Name</label>
+                        <input type="text" id="guest-name" class="form-control" placeholder="e.g. John Doe" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="guest-email">Your Email Address</label>
+                        <input type="email" id="guest-email" class="form-control" placeholder="e.g. john@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="meeting-title">Meeting Title / Topic</label>
+                        <input type="text" id="meeting-title" class="form-control" placeholder="e.g. Partnership Discussion" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="meeting-description">Brief Description / Agenda</label>
+                        <textarea id="meeting-description" class="form-control" placeholder="What would you like to discuss?"></textarea>
+                    </div>
+                    
+                    <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                        <button type="button" class="btn btn-secondary" id="close-modal-btn">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="submit-booking-btn">Confirm Book</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Success Screen -->
+        <div class="glass-card success-container" id="success-screen" style="display: none; max-width: 600px; margin: 0 auto;">
+            <div class="success-icon">✓</div>
+            <h2>Meeting Successfully Booked!</h2>
+            <p class="subtitle" style="margin-bottom: 2rem;">We have registered your session. A calendar invite has been sent to your email with the details.</p>
+            
+            <div style="text-align: left; background: rgba(0,0,0,0.2); border: 1px solid var(--card-border); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
+                <p style="margin-bottom: 0.5rem;"><strong style="color: var(--text-muted);">Meeting:</strong> <span id="success-meeting-title"></span></p>
+                <p style="margin-bottom: 0.5rem;"><strong style="color: var(--text-muted);">Host:</strong> <span id="success-host-name"></span></p>
+                <p style="margin-bottom: 0.5rem;"><strong style="color: var(--text-muted);">Time:</strong> <span id="success-time"></span></p>
+                <p style="margin-bottom: 0.5rem;"><strong style="color: var(--text-muted);">Location:</strong> <span id="success-location">Discord Temporary Voice Channel</span></p>
+            </div>
+            
+            <div style="background: rgba(138, 43, 226, 0.1); border: 1px solid rgba(138, 43, 226, 0.2); border-radius: 8px; padding: 1rem; font-size: 0.9rem; text-align: left; line-height: 1.5; color: var(--text-main); margin-bottom: 2.5rem;">
+                ℹ️ **Discord VC Provisioning**: Five minutes before the meeting starts, the bot will automatically provision a temporary voice channel in the Bits&Bytes server named after the meeting and ping the invitees via Discord DM with the join link.
+            </div>
+
+            <a href="/" class="btn btn-primary">Return to Scheduler Home</a>
+        </div>
+    </main>
+
+    <footer>
+        <p>© 2026 Bits&Bytes Network. Powered by Discord Voice Infrastructure.</p>
+    </footer>
+
+    <script>
+        // Extract booking link from URL path
+        const bookingLink = window.location.pathname.substring(1);
+        let hostData = null;
+        let currentDate = new Date();
+        let selectedDateStr = '';
+        let selectedTimeSlot = '';
+
+        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+        async function loadHostDetails() {
+            try {
+                const res = await fetch(`/api/users`);
+                const users = await res.json();
+                hostData = users.find(u => u.booking_link === bookingLink);
+                
+                if (!hostData) {
+                    document.getElementById('booking-flow').innerHTML = `
+                        <div class="empty-state" style="grid-column: 1 / -1; color: var(--error);">
+                            <div class="empty-icon">🔍</div>
+                            <h2>Host Not Found</h2>
+                            <p class="subtitle" style="margin-top: 0.5rem;">The booking handle "${bookingLink}" is not registered.</p>
+                            <a href="/" class="btn btn-secondary">Go to Home</a>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                document.getElementById('host-avatar').textContent = hostData.title.charAt(0).toUpperCase();
+                document.getElementById('host-name').textContent = hostData.title;
+                document.getElementById('host-title').textContent = `@${hostData.booking_link}`;
+                document.getElementById('host-description').textContent = hostData.description || 'No bio provided.';
+                document.getElementById('host-timezone').textContent = hostData.timezone;
+                
+                renderCalendar();
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+            
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            
+            document.getElementById('month-display').textContent = `${months[month]} ${year}`;
+            
+            // Add Day labels (Mon, Tue, etc)
+            const daysOfWeek = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+            daysOfWeek.forEach(day => {
+                const label = document.createElement('div');
+                label.className = 'calendar-day-label';
+                label.textContent = day;
+                grid.appendChild(label);
+            });
+            
+            const firstDay = new Date(year, month, 1).getDay();
+            const totalDays = new Date(year, month + 1, 0).getDate();
+            
+            // Empty spacer days
+            for (let i = 0; i < firstDay; i++) {
+                const spacer = document.createElement('div');
+                grid.appendChild(spacer);
+            }
+            
+            // Render days
+            const today = new Date();
+            const weeklyHours = hostData.weekly_hours ? JSON.parse(hostData.weekly_hours) : {};
+            
+            for (let day = 1; day <= totalDays; day++) {
+                const dayDate = new Date(year, month, day);
+                const dayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                
+                const calendarDay = document.createElement('div');
+                calendarDay.className = 'calendar-day';
+                calendarDay.textContent = day;
+                
+                // Check if in past
+                const isPast = new Date(year, month, day, 23, 59, 59) < today;
+                
+                // Check weekday availability
+                const weekdayName = dayDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+                const hasHours = weeklyHours[weekdayName] && weeklyHours[weekdayName].length > 0;
+                
+                if (isPast || !hasHours) {
+                    calendarDay.className += ' disabled';
+                } else {
+                    if (dayDate.toDateString() === today.toDateString()) {
+                        calendarDay.className += ' today';
+                    }
+                    
+                    calendarDay.addEventListener('click', () => {
+                        // Clear previous active
+                        const active = grid.querySelector('.calendar-day.active');
+                        if (active) active.classList.remove('active');
+                        
+                        calendarDay.classList.add('active');
+                        selectDate(dayStr);
+                    });
+                }
+                
+                grid.appendChild(calendarDay);
+            }
+        }
+
+        async function selectDate(dateStr) {
+            selectedDateStr = dateStr;
+            const slotsSection = document.getElementById('slots-section');
+            const slotsGrid = document.getElementById('slots-grid');
+            
+            slotsSection.style.display = 'block';
+            slotsGrid.innerHTML = '<p style="color: var(--text-muted); font-size: 0.9rem;">Fetching available slots...</p>';
+            
+            const dateObj = new Date(dateStr);
+            const dateFormatted = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+            document.getElementById('selected-date-heading').textContent = `Available Timeslots for ${dateFormatted}`;
+            
+            try {
+                const res = await fetch(`/api/availability/${bookingLink}?date=${dateStr}`);
+                const slots = await res.json();
+                
+                slotsGrid.innerHTML = '';
+                
+                if (slots.length === 0) {
+                    slotsGrid.innerHTML = '<p style="color: var(--error); font-size: 0.9rem; grid-column: 1 / -1;">No slots available on this date.</p>';
+                    return;
+                }
+                
+                slots.forEach(slot => {
+                    const btn = document.createElement('button');
+                    btn.className = 'slot-btn';
+                    btn.textContent = slot;
+                    btn.type = 'button';
+                    
+                    btn.addEventListener('click', () => {
+                        selectedTimeSlot = slot;
+                        openBookingModal();
+                    });
+                    
+                    slotsGrid.appendChild(btn);
+                });
+            } catch (err) {
+                console.error(err);
+                slotsGrid.innerHTML = '<p style="color: var(--error); font-size: 0.9rem;">Failed to fetch slots.</p>';
+            }
+        }
+
+        // Modal triggers
+        function openBookingModal() {
+            const modal = document.getElementById('booking-modal');
+            const label = document.getElementById('selected-datetime-label');
+            
+            const dateObj = new Date(selectedDateStr);
+            const dateFormatted = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+            
+            label.textContent = `${dateFormatted} at ${selectedTimeSlot} (${hostData.timezone})`;
+            
+            modal.style.display = 'flex';
+        }
+
+        document.getElementById('close-modal-btn').addEventListener('click', () => {
+            document.getElementById('booking-modal').style.display = 'none';
+        });
+
+        // Handle navigation
+        document.getElementById('prev-month').addEventListener('click', () => {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            renderCalendar();
+            document.getElementById('slots-section').style.display = 'none';
+        });
+
+        document.getElementById('next-month').addEventListener('click', () => {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            renderCalendar();
+            document.getElementById('slots-section').style.display = 'none';
+        });
+
+        // Submit Booking Form
+        document.getElementById('booking-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const name = document.getElementById('guest-name').value.trim();
+            const email = document.getElementById('guest-email').value.trim();
+            const title = document.getElementById('meeting-title').value.trim();
+            const description = document.getElementById('meeting-description').value.trim();
+            
+            const submitBtn = document.getElementById('submit-booking-btn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Booking...';
+            
+            try {
+                const res = await fetch(`/api/book/${bookingLink}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        date: selectedDateStr,
+                        slot: selectedTimeSlot,
+                        name,
+                        email,
+                        title,
+                        description
+                    })
+                });
+                
+                if (res.ok) {
+                    document.getElementById('booking-modal').style.display = 'none';
+                    document.getElementById('booking-flow').style.display = 'none';
+                    
+                    document.getElementById('success-meeting-title').textContent = title;
+                    document.getElementById('success-host-name').textContent = hostData.title;
+                    
+                    const dateObj = new Date(selectedDateStr);
+                    const dateFormatted = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+                    document.getElementById('success-time').textContent = `${dateFormatted} @ ${selectedTimeSlot} (${hostData.timezone})`;
+                    
+                    document.getElementById('success-screen').style.display = 'block';
+                } else {
+                    const err = await res.json();
+                    alert(err.error || 'Failed to book meeting. The slot may have been taken.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Connection failure during booking.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Confirm Book';
+            }
+        });
+
+        loadHostDetails();
+    </script>
+</body>
+</html>
