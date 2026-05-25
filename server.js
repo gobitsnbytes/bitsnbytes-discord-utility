@@ -634,6 +634,14 @@ function startWebServer(client) {
                 await meetingsDb.addAttendee(id, 'user', host.discord_id);
             }
 
+            // Look up the booker's email and add them as an attendee if they are a registered Discord user
+            const bookerUser = await db.get(`SELECT * FROM user_availability WHERE email = ?`, [email.trim().toLowerCase()]);
+            if (bookerUser) {
+                await meetingsDb.addAttendee(id, 'user', bookerUser.discord_id);
+            } else if (req.user && req.user.id) {
+                await meetingsDb.addAttendee(id, 'user', req.user.id);
+            }
+
             // Invite the whole fork if requested and host has role mapping
             for (const host of allHosts) {
                 if (inviteWholeFork && host.associated_role_id) {

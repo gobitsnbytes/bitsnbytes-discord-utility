@@ -67,6 +67,7 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            flex: 1;
         }
         .copy-btn {
             background: var(--secondary);
@@ -130,7 +131,7 @@
                 <p class="subtitle" style="margin-bottom: 2.5rem;">Setup your bio and weekly availability ranges. These configurations determine exactly when external guests are allowed to schedule voice conferences with you.</p>
 
                 <form id="availability-form">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    <div class="profile-grid">
                         <div class="form-group">
                             <label for="title">Display Title</label>
                             <input type="text" id="title" class="form-control" placeholder="e.g. Akshat Kapoor (Tech Coordinator)" required>
@@ -234,6 +235,10 @@
                 startInput.disabled = !enabled;
                 endInput.disabled = !enabled;
                 row.classList.toggle('day-disabled', !enabled);
+                const copyBtn = row.querySelector('.copy-row-btn');
+                if (copyBtn) {
+                    copyBtn.disabled = !enabled;
+                }
             });
         });
 

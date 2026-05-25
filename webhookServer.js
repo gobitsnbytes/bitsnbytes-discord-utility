@@ -96,6 +96,12 @@ async function handleBookingCreated(client, payload) {
 		try {
 			await meetingsDb.setCalcomBookingId(linkedMeetingId, uid);
 			logger.info(`[WEBHOOK] Linked Cal.com booking ${uid} to Discord meeting ${linkedMeetingId}.`);
+
+			// Match emails to registered Discord users and add them as attendees to the existing meeting
+			for (const discordId of matchedDiscordIds) {
+				await meetingsDb.addAttendee(linkedMeetingId, 'user', discordId);
+			}
+			logger.info(`[WEBHOOK] Associated ${matchedDiscordIds.length} Discord users as attendees for linked meeting ${linkedMeetingId}.`);
 		} catch (err) {
 			logger.warn(`[WEBHOOK] Failed to link booking ${uid} to meeting ${linkedMeetingId}:`, err);
 		}
