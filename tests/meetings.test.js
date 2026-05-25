@@ -170,6 +170,7 @@ describe('Slash Command: /meet-schedule Authorization', () => {
 				getUser: jest.fn(),
 				getRole: jest.fn(),
 				getBoolean: jest.fn(),
+				getInteger: jest.fn(),
 			},
 		};
 	});

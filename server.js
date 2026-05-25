@@ -53,6 +53,10 @@ function startWebServer(client) {
 
     app.use(express.static(path.join(__dirname, 'public')));
 
+    app.get('/favicon.ico', (req, res) => {
+        res.redirect('/favicon.svg');
+    });
+
     // Auth verification helper middleware
     function checkAuth(req, res, next) {
         const sessionId = req.cookies.session_id;
