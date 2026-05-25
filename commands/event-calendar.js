@@ -64,6 +64,43 @@ module.exports = {
 
 			await interaction.editReply({ embeds: [embed] });
 
+			// Append upcoming Cal.com scheduled meetings as a follow-up message
+			if (process.env.CALCOM_API_KEY) {
+				try {
+					const calcom = require('../lib/calcom');
+					const calcomBookings = await calcom.getUpcomingBookings();
+					if (calcomBookings && calcomBookings.length > 0) {
+						const bookingLines = calcomBookings.slice(0, 10).map(b => {
+							const start = b.start
+								? new Date(b.start).toLocaleString('en-IN', {
+									timeZone: 'Asia/Kolkata',
+									day: 'numeric', month: 'short',
+									hour: 'numeric', minute: '2-digit', hour12: true
+								}) + ' IST'
+								: 'TBD';
+							const title = b.title || b.eventType?.title || 'Meeting';
+							const attendee = b.attendees?.[0]?.name || b.attendee?.name || 'Internal';
+							return `\`${start}\` **${title}** — with ${attendee}`;
+						}).join('\n');
+
+						const meetEmbed = new EmbedBuilder()
+							.setTitle(`🗓️ SCHEDULED_MEETINGS // CAL.COM`)
+							.setColor(config.COLORS.primary)
+							.addFields({
+								name: `${calcomBookings.length} upcoming booking(s)`,
+								value: bookingLines.substring(0, 1000),
+								inline: false
+							})
+							.setFooter({ text: config.BRANDING.footerText })
+							.setTimestamp();
+
+						await interaction.followUp({ embeds: [meetEmbed], ephemeral: true });
+					}
+				} catch (calErr) {
+					console.warn('[EVENT_CALENDAR] Cal.com fetch failed (non-fatal):', calErr.message);
+				}
+			}
+
 		} catch (error) {
 			console.error('[EVENT_CALENDAR_ERROR]', error);
 			await interaction.editReply({

@@ -24,6 +24,7 @@ module.exports = {
 					{ name: '✅ Approved', value: 'Approved' },
 					{ name: '🚀 Executing', value: 'Executing' },
 					{ name: '🎉 Completed', value: 'Completed' },
+					{ name: '❌ Cancelled', value: 'Cancelled' },
 				))
 		.addStringOption(option =>
 			option
@@ -91,6 +92,20 @@ module.exports = {
 			if (attendees !== null) update.attendees = attendees;
 
 			await notion.updateEvent(eventId, update);
+
+			// Sync Cal.com: cancel booking if event is cancelled
+			if (status === 'Cancelled' && event.calcomBookingId && process.env.CALCOM_API_KEY) {
+				try {
+					const calcom = require('../lib/calcom');
+					await calcom.cancelBooking(
+						event.calcomBookingId,
+						`Event cancelled via Discord by ${interaction.user.username}`
+					);
+					console.log(`[EVENT_UPDATE] Cal.com booking ${event.calcomBookingId} cancelled`);
+				} catch (calErr) {
+					console.warn('[EVENT_UPDATE] Cal.com cancel failed (non-fatal):', calErr.message);
+				}
+			}
 
 			const embed = new EmbedBuilder()
 				.setTitle(`${config.EMOJIS.protocol} EVENT_UPDATED`)

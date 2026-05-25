@@ -53,10 +53,19 @@ module.exports = {
 			option.setName('external-emails')
 				.setDescription('Additional external guest emails (comma separated)')
 				.setRequired(false))
+		.addStringOption(option =>
+			option.setName('notes')
+				.setDescription('Meeting notes or private agenda (visible in Google Calendar)')
+				.setRequired(false))
 		.addIntegerOption(option =>
 			option.setName('duration')
 				.setDescription('Duration of the meeting in minutes (default: 30)')
-				.setRequired(false)),
+				.setRequired(false)
+				.addChoices(
+					{ name: '15 minutes', value: 15 },
+					{ name: '30 minutes', value: 30 },
+					{ name: '45 minutes', value: 45 }
+				)),
 
 	async execute(interaction) {
 		const { isStaff, getForkLeadRole } = require('../lib/auth');
@@ -90,11 +99,12 @@ module.exports = {
 			const locationType = interaction.options.getString('location-type');
 			const locationDetails = interaction.options.getString('location-details') || '';
 			const description = interaction.options.getString('description') || '';
+			const notes = interaction.options.getString('notes') || '';
 			const userInvite = interaction.options.getUser('user-invite');
 			const roleInvite = interaction.options.getRole('role-invite');
 			const instant = interaction.options.getBoolean('instant') || false;
 			const externalEmailsStr = interaction.options.getString('external-emails') || '';
-			const duration = (typeof interaction.options.getInteger === 'function' ? interaction.options.getInteger('duration') : null) || 30;
+			const duration = interaction.options.getInteger('duration') || 30;
 
 			let scheduledTime;
 			if (instant || (!dateStr && !timeStr)) {
@@ -142,43 +152,48 @@ module.exports = {
 				});
 			}
 
-			// Push booking to Cal.com if configured
+			// Push booking to Cal.com using duration-based event type routing
+			// (matches the same logic used by the web booking portal)
 			let calcomBookingId = null;
 			if (process.env.CALCOM_API_KEY) {
 				try {
-					const calcom = require('../lib/calcom');
-					const eventTypes = await calcom.getEventTypes();
-					if (eventTypes && eventTypes.length > 0) {
-						const eventType = eventTypes[0];
+					const d = parseInt(duration, 10);
+					const calcomEventTypeId = d <= 15
+						? process.env.CALCOM_EVENT_TYPE_15
+						: d <= 30
+							? process.env.CALCOM_EVENT_TYPE_30
+							: process.env.CALCOM_EVENT_TYPE_45;
+
+					if (calcomEventTypeId) {
+						const calcom = require('../lib/calcom');
 						const creatorEmail = await meetingsDb.getUserEmail(interaction.user.id) || process.env.SMTP_USER || 'hello@gobitsnbytes.org';
-						
+						const meetingNotes = [notes, description].filter(Boolean).join('\n\n');
+
 						const bookingBody = {
-							eventTypeId: eventType.id,
+							eventTypeId: parseInt(calcomEventTypeId, 10),
 							start: new Date(scheduledTime).toISOString(),
-							end: new Date(endTime).toISOString(),
 							timeZone: 'Asia/Kolkata',
 							language: 'en',
-							metadata: {
-								discord_meeting_id: id
-							},
+							metadata: { discord_meeting_id: id },
 							attendee: {
 								name: interaction.user.username,
 								email: creatorEmail,
 								timeZone: 'Asia/Kolkata'
-							}
+							},
+							...(externalEmails.length > 0 && { guests: externalEmails }),
+							...(meetingNotes && {
+								bookingFieldsResponses: { notes: meetingNotes }
+							})
 						};
-
-						if (externalEmails.length > 0) {
-							bookingBody.guests = externalEmails;
-						}
 
 						const bookingResponse = await calcom.createBooking(bookingBody);
 						if (bookingResponse && (bookingResponse.uid || bookingResponse.id)) {
 							calcomBookingId = String(bookingResponse.uid || bookingResponse.id);
+							console.log(`[MEET_SCHEDULE] Cal.com booking created: ${calcomBookingId} (${duration}min)`);
 						}
 					}
 				} catch (calcomErr) {
-					console.warn('[MEET_SCHEDULE] Cal.com sync failed:', calcomErr.message);
+					console.warn('[MEET_SCHEDULE] Cal.com sync failed (non-fatal):', calcomErr.message);
 				}
 			}
 
@@ -257,15 +272,22 @@ module.exports = {
 				.addFields(
 					{ name: '📋 TITLE', value: title, inline: false },
 					{ name: '📅 SCHEDULED TIME (IST)', value: `\`${istTimeString}\` (<t:${Math.floor(scheduledTime / 1000)}:F> / <t:${Math.floor(scheduledTime / 1000)}:R>)`, inline: false },
+					{ name: '⏱️ DURATION', value: `${duration} minutes`, inline: true },
 					{ name: '🌐 LOCATION', value: locationType === 'discord_vc' ? (vcLink ? `🔊 [Click to Join VC](${vcLink})` : 'Discord Temporary VC') : (locationDetails || 'External Link'), inline: true },
-					{ name: '👥 INVITEES', value: displayInvitees.join(', ') || 'None', inline: true }
+					{ name: '👥 INVITEES', value: displayInvitees.join(', ') || 'None', inline: false }
 				)
 				.setColor(isInstant ? config.COLORS.primary : config.COLORS.success)
 				.setTimestamp()
 				.setFooter({ text: config.BRANDING.footerText });
 
 			if (description) {
-				embed.addFields({ name: '📝 DESCRIPTION', value: description, inline: false });
+				embed.addFields({ name: '📝 AGENDA', value: description, inline: false });
+			}
+			if (notes) {
+				embed.addFields({ name: '🗒️ MEETING NOTES', value: notes, inline: false });
+			}
+			if (calcomBookingId) {
+				embed.addFields({ name: '📆 GOOGLE CALENDAR', value: `Synced → [cal.com/bitsnbytes](https://cal.com/bitsnbytes)`, inline: false });
 			}
 
 			// Post the confirmation in the events channel

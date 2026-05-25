@@ -96,6 +96,35 @@ module.exports = {
 				createdBy: interaction.user.id,
 			});
 
+			// Push to Cal.com -> Google Calendar for visibility
+			let calcomBookingId = null;
+			if (process.env.CALCOM_API_KEY && process.env.CALCOM_EVENT_TYPE_30) {
+				try {
+					const calcom = require('../lib/calcom');
+					const bookingResponse = await calcom.createBooking({
+						eventTypeId: parseInt(process.env.CALCOM_EVENT_TYPE_30, 10),
+						start: new Date(`${dateStr}T10:00:00+05:30`).toISOString(),
+						timeZone: 'Asia/Kolkata',
+						language: 'en',
+						metadata: { discord_event_id: event?.id || 'unknown', fork_city: city },
+						attendee: {
+							name: interaction.user.username,
+							email: process.env.SMTP_USER || 'hello@gobitsnbytes.org',
+							timeZone: 'Asia/Kolkata'
+						},
+						bookingFieldsResponses: {
+							notes: `Fork Event: ${title}\nCity: ${city}\nType: ${type}\n\n${description}`.trim()
+						}
+					});
+					if (bookingResponse && (bookingResponse.uid || bookingResponse.id)) {
+						calcomBookingId = String(bookingResponse.uid || bookingResponse.id);
+						console.log(`[EVENT_CREATE] Cal.com booking created: ${calcomBookingId} for ${city} fork event`);
+					}
+				} catch (calErr) {
+					console.warn('[EVENT_CREATE] Cal.com sync failed (non-fatal):', calErr.message);
+				}
+			}
+
 			// Award points for creating event
 			try {
 				await notion.updateForkPoints(fork.id, 2);
@@ -140,6 +169,14 @@ module.exports = {
 				value: '+2 points awarded for creating an event!',
 				inline: false,
 			});
+
+			if (calcomBookingId) {
+				embed.addFields({
+					name: '📆 GOOGLE CALENDAR',
+					value: 'Synced → will appear on the BnB central calendar',
+					inline: false,
+				});
+			}
 
 			await interaction.editReply({ embeds: [embed] });
 

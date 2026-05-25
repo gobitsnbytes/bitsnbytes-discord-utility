@@ -771,3 +771,63 @@ footer {
     transform: translateX(-50%) translateY(0);
     opacity: 1;
 }
+
+/* ── Responsive: Mobile (≤600px) ───────────────────── */
+@media (max-width: 600px) {
+    .container { padding: 0 1rem; }
+
+    /* Availability rows stack on mobile */
+    .day-availability-row {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding: 0.65rem 0.75rem;
+    }
+
+    .day-info { min-width: unset; flex: 1; }
+
+    .time-slots-inputs {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    /* Always show copy button on touch (no hover) */
+    .copy-row-btn {
+        opacity: 1 !important;
+        pointer-events: all !important;
+        font-size: 0.65rem;
+        padding: 0.2rem 0.4rem;
+    }
+
+    .availability-toolbar { gap: 0.4rem; }
+    .avail-action-btn { font-size: 0.7rem; padding: 0.25rem 0.6rem; }
+
+    /* Dashboard sidebar stacks on mobile */
+    .dashboard-layout {
+        flex-direction: column !important;
+    }
+
+    /* Book page: slot buttons fill width */
+    .slots-grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+    }
+
+    /* Booking modal full width */
+    .modal-box {
+        width: 95vw !important;
+        padding: 1.25rem !important;
+    }
+}
+
+/* ── Responsive: Tablet (601px–900px) ──────────────── */
+@media (min-width: 601px) and (max-width: 900px) {
+    .slots-grid {
+        grid-template-columns: repeat(4, 1fr) !important;
+    }
+
+    .copy-row-btn {
+        opacity: 1 !important;
+        pointer-events: all !important;
+    }
+}
+
