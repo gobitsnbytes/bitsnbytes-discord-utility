@@ -235,6 +235,13 @@ function startWebServer(client) {
                 console.error('[AUTH_CALLBACK] Failed to save session to DB:', err.message);
             });
 
+            // Sync email to meeting_email_preferences table automatically from OAuth profile
+            if (userData.email) {
+                await meetingsDb.setUserEmail(userData.id, userData.email).catch(err => {
+                    console.error('[AUTH_CALLBACK] Failed to save email preference:', err.message);
+                });
+            }
+
             // Write record or update username in user_availability table ONLY if they are a contributor (host)
             if (hasContributorRole) {
                 let defaultTitle = userData.username;

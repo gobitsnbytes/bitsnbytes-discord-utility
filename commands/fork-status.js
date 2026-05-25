@@ -86,13 +86,28 @@ module.exports = {
 				inline: false,
 			});
 
-			// Team Structure
+			// Team Structure - pre-fetch member nicknames/display names
+			const resolvedMembers = await Promise.all(
+				teamMembers.map(async m => {
+					try {
+						return await interaction.guild.members.fetch(m.discordId);
+					} catch {
+						return null;
+					}
+				})
+			);
+
 			let teamText = '';
 			for (const role of teamValidator.REQUIRED_ROLES) {
 				const members = teamMembers.filter(m => m.role === role);
 				const emoji = teamValidator.getRoleEmoji(role);
 				if (members.length > 0) {
-					const mentions = members.map(m => `<@${m.discordId}>`).join(', ');
+					const mentions = members.map(m => {
+						const idx = teamMembers.findIndex(tm => tm.discordId === m.discordId);
+						const member = resolvedMembers[idx];
+						const name = member ? member.displayName : m.name;
+						return name ? `${name} (<@${m.discordId}>)` : `<@${m.discordId}>`;
+					}).join(', ');
 					teamText += `${emoji} **${role}**: ${mentions} ✅\n`;
 				} else {
 					teamText += `${emoji} **${role}**: ⚠️ MISSING\n`;
@@ -179,11 +194,13 @@ module.exports = {
 				});
 			}
 
-			// Fork Lead
+			// Fork Lead - pre-fetch member nickname/display name
 			if (leadId) {
+				const leadMember = await interaction.guild.members.fetch(leadId).catch(() => null);
+				const displayName = leadMember ? leadMember.displayName : leadName;
 				embed.addFields({
 					name: '👤 FORK_LEAD',
-					value: `<@${leadId}>`,
+					value: displayName ? `${displayName} (<@${leadId}>)` : `<@${leadId}>`,
 					inline: false,
 				});
 			}

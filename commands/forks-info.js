@@ -4,7 +4,7 @@ const config = require('../config');
 const auth = require('../lib/auth');
 const db = require('../lib/db');
 
-function buildEmbed(active, pending, activeStats, timestamp, guild) {
+function buildEmbed(active, pending, activeStats, timestamp, guild, leadNames = {}) {
 	const embed = new EmbedBuilder()
 		.setTitle(`📡 NETWORK_TOPOLOGY // NET_STATUS_RECAP`)
 		.setDescription(`Real-time synchronization status and telemetry of all active and discovery nodes.`)
@@ -30,7 +30,8 @@ function buildEmbed(active, pending, activeStats, timestamp, guild) {
 			const points = f.properties?.['Points']?.number || 0;
 			const teamCount = activeStats[f.id] || 0;
 
-			const leadDisplay = leadId ? `<@${leadId}>` : (leadName || 'ANONYMOUS');
+			const displayName = leadNames[leadId] || leadName;
+			const leadDisplay = leadId ? (displayName ? `${displayName} (<@${leadId}>)` : `<@${leadId}>`) : (leadName || 'ANONYMOUS');
 			activeList += `🟢 **${city}** — Lead: ${leadDisplay}\n▪ Points: \`${points}\` | Health: \`${health}/100\` | Team: \`${teamCount} members\`\n\n`;
 		});
 	}
@@ -127,8 +128,9 @@ module.exports = {
 				.filter(isValidFork)
 				.filter(f => f.properties?.Status?.select?.name === 'Pending');
 
-			// Get team members counts
+			// Get team members counts and pre-fetch lead names
 			const activeStats = {};
+			const leadNames = {};
 			for (const f of active) {
 				try {
 					const team = await notion.getTeamMembers(f.id);
@@ -136,9 +138,19 @@ module.exports = {
 				} catch (e) {
 					activeStats[f.id] = 0;
 				}
+
+				const leadId = notion.getLeadDiscordId(f);
+				if (leadId) {
+					try {
+						const m = await interaction.guild.members.fetch(leadId);
+						leadNames[leadId] = m.displayName;
+					} catch (e) {
+						leadNames[leadId] = f.properties?.["What's your name?"]?.rich_text?.[0]?.text?.content;
+					}
+				}
 			}
 
-			const embed = buildEmbed(active, pending, activeStats, Date.now(), interaction.guild);
+			const embed = buildEmbed(active, pending, activeStats, Date.now(), interaction.guild, leadNames);
 			const buttons = buildButtons();
 
 			// Check if we have a stored message
@@ -219,6 +231,7 @@ module.exports = {
 				.filter(f => f.properties?.Status?.select?.name === 'Pending');
 
 			const activeStats = {};
+			const leadNames = {};
 			for (const f of active) {
 				try {
 					const team = await notion.getTeamMembers(f.id);
@@ -226,9 +239,19 @@ module.exports = {
 				} catch (e) {
 					activeStats[f.id] = 0;
 				}
+
+				const leadId = notion.getLeadDiscordId(f);
+				if (leadId) {
+					try {
+						const m = await interaction.guild.members.fetch(leadId);
+						leadNames[leadId] = m.displayName;
+					} catch (e) {
+						leadNames[leadId] = f.properties?.["What's your name?"]?.rich_text?.[0]?.text?.content;
+					}
+				}
 			}
 
-			const embed = buildEmbed(active, pending, activeStats, Date.now(), interaction.guild);
+			const embed = buildEmbed(active, pending, activeStats, Date.now(), interaction.guild, leadNames);
 			const buttons = buildButtons();
 
 			await interaction.message.edit({ embeds: [embed], components: [buttons] });
