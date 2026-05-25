@@ -38,7 +38,20 @@ module.exports = {
                 const chunk = active.slice(i, i + pageSize);
                 const pageNum = Math.floor(i / pageSize) + 1;
 
-                const activeList = chunk.map(f => {
+                // Pre-fetch all members in the current chunk from the guild cache or Discord API to resolve display names
+                const resolvedMembers = await Promise.all(
+                    chunk.map(async f => {
+                        const leadId = f.properties?.['Discord ID']?.rich_text?.[0]?.text?.content;
+                        if (!leadId) return null;
+                        try {
+                            return await interaction.guild.members.fetch(leadId);
+                        } catch (err) {
+                            return null;
+                        }
+                    })
+                );
+
+                const activeList = chunk.map((f, index) => {
                     const city = (f.properties?.["What city are you in?"]?.rich_text?.[0]?.text?.content || 
                                  f.properties?.["Fork Name"]?.title?.[0]?.text?.content || 
                                  'UNKNOWN').toUpperCase();
@@ -46,7 +59,15 @@ module.exports = {
                     const leadName = f.properties?.["What's your name?"]?.rich_text?.[0]?.text?.content;
                     
                     const label = `${config.EMOJIS.node} [${city}]`.padEnd(22, '.');
-                    const leadDisplay = leadId ? `<@${leadId}>` : (leadName || 'ANONYMOUS');
+                    
+                    let leadDisplay;
+                    if (leadId) {
+                        const member = resolvedMembers[index];
+                        const displayName = member ? member.displayName : leadName;
+                        leadDisplay = displayName ? `${displayName} (<@${leadId}>)` : `<@${leadId}>`;
+                    } else {
+                        leadDisplay = leadName || 'ANONYMOUS';
+                    }
                     
                     return `\`${label}\` ${leadDisplay}`;
                 }).join('\n');

@@ -51,7 +51,19 @@ module.exports = {
 
 
             // Signal Readout Formatting
-            const activeLines = active.map(f => {
+            const resolvedActiveMembers = await Promise.all(
+                active.map(async f => {
+                    const leadId = f.properties?.['Discord ID']?.rich_text?.[0]?.text?.content;
+                    if (!leadId) return null;
+                    try {
+                        return await interaction.guild.members.fetch(leadId);
+                    } catch (err) {
+                        return null;
+                    }
+                })
+            );
+
+            const activeLines = active.map((f, index) => {
                 const city = (f.properties?.["What city are you in?"]?.rich_text?.[0]?.text?.content || 
                              f.properties?.["Fork Name"]?.title?.[0]?.text?.content || 
                              'UNKNOWN').toUpperCase();
@@ -59,7 +71,15 @@ module.exports = {
                 const leadName = f.properties?.["What's your name?"]?.rich_text?.[0]?.text?.content;
                 
                 const label = `${config.EMOJIS.node} [${city}]`.padEnd(22, '.');
-                const leadDisplay = leadId ? `<@${leadId}>` : (leadName || 'ANONYMOUS');
+                
+                let leadDisplay;
+                if (leadId) {
+                    const member = resolvedActiveMembers[index];
+                    const displayName = member ? member.displayName : leadName;
+                    leadDisplay = displayName ? `${displayName} (<@${leadId}>)` : `<@${leadId}>`;
+                } else {
+                    leadDisplay = leadName || 'ANONYMOUS';
+                }
                 
                 return `\`${label}\` ${config.EMOJIS.active} **ONLINE** // ${leadDisplay}`;
             });

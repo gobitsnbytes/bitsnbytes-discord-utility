@@ -105,9 +105,27 @@ module.exports = {
 					.setTimestamp()
 					.setFooter({ text: config.BRANDING.footerText });
 
-				const statusText = forkStatuses.map(f => {
+				const resolvedMembers = await Promise.all(
+					forkStatuses.map(async f => {
+						if (!f.leadId) return null;
+						try {
+							return await interaction.guild.members.fetch(f.leadId);
+						} catch {
+							return null;
+						}
+					})
+				);
+
+				const statusText = forkStatuses.map((f, index) => {
 					const label = onboarding.getOnboardingStatusLabel(f.status);
-					const mention = f.leadId ? `<@${f.leadId}>` : 'No lead';
+					let mention;
+					if (f.leadId) {
+						const member = resolvedMembers[index];
+						const displayName = member ? member.displayName : null;
+						mention = displayName ? `${displayName} (<@${f.leadId}>)` : `<@${f.leadId}>`;
+					} else {
+						mention = 'No lead';
+					}
 					return `${label.emoji} **${f.city.toUpperCase()}**: ${f.status.progress}/7 (${label.label}) — ${mention}`;
 				}).join('\n');
 
