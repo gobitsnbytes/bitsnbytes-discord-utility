@@ -166,6 +166,15 @@
 
                     <h3 style="margin: 3rem 0 1rem 0; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">Weekly Availability Hours</h3>
 
+                    <!-- Bulk action toolbar -->
+                    <div class="availability-toolbar">
+                        <span style="font-size: 0.75rem; color: var(--muted-foreground); margin-right: 0.25rem;">Quick select:</span>
+                        <button type="button" class="avail-action-btn" onclick="selectDays('weekdays')">Weekdays</button>
+                        <button type="button" class="avail-action-btn" onclick="selectDays('weekend')">Weekend</button>
+                        <button type="button" class="avail-action-btn" onclick="selectDays('all')">All days</button>
+                        <button type="button" class="avail-action-btn" onclick="selectDays('none')">Clear all</button>
+                    </div>
+
                     <div id="days-container">
                         <!-- Populated by JS -->
                     </div>
@@ -186,35 +195,83 @@
         const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         
 
-        // Render empty day rows
+        // Render day rows with toggle switches and copy-to-all
         const daysContainer = document.getElementById('days-container');
+        const weekdays = ['monday','tuesday','wednesday','thursday','friday'];
+        const weekend = ['saturday','sunday'];
+
         days.forEach(day => {
             const dayCap = day.charAt(0).toUpperCase() + day.slice(1);
             const row = document.createElement('div');
-            row.className = 'day-availability-row';
+            row.className = 'day-availability-row day-disabled';
+            row.id = `row-${day}`;
             row.innerHTML = `
                 <div class="day-info">
-                    <input type="checkbox" id="check-${day}" class="day-checkbox">
-                    <label for="check-${day}" style="font-weight: 600; cursor: pointer;">${dayCap}</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="check-${day}">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <label for="check-${day}" style="font-weight: 600; cursor: pointer; user-select: none;">${dayCap}</label>
                 </div>
                 <div class="time-slots-inputs">
                     <input type="time" id="start-${day}" class="time-input" value="09:00" disabled>
-                    <span style="color: var(--muted-foreground)">to</span>
+                    <span style="color: var(--muted-foreground); font-size: 0.8rem;">to</span>
                     <input type="time" id="end-${day}" class="time-input" value="17:00" disabled>
+                    <button type="button" class="copy-row-btn" onclick="copyRowToAll('${day}')" title="Copy these hours to all active days">
+                        Copy to all
+                    </button>
                 </div>
             `;
             daysContainer.appendChild(row);
-            
-            // Enable/disable time inputs based on checkbox
+
             const checkbox = document.getElementById(`check-${day}`);
             const startInput = document.getElementById(`start-${day}`);
             const endInput = document.getElementById(`end-${day}`);
-            
+
             checkbox.addEventListener('change', () => {
-                startInput.disabled = !checkbox.checked;
-                endInput.disabled = !checkbox.checked;
+                const enabled = checkbox.checked;
+                startInput.disabled = !enabled;
+                endInput.disabled = !enabled;
+                row.classList.toggle('day-disabled', !enabled);
             });
         });
+
+        // Bulk select helper
+        function selectDays(mode) {
+            const targets = mode === 'weekdays' ? weekdays
+                          : mode === 'weekend'  ? weekend
+                          : mode === 'all'      ? days
+                          : [];
+            days.forEach(day => {
+                const cb = document.getElementById(`check-${day}`);
+                const shouldCheck = targets.includes(day);
+                if (cb.checked !== shouldCheck) {
+                    cb.checked = shouldCheck;
+                    cb.dispatchEvent(new Event('change'));
+                }
+            });
+        }
+
+        // Copy this row's time range to all currently enabled days
+        function copyRowToAll(sourceDay) {
+            const start = document.getElementById(`start-${sourceDay}`).value;
+            const end   = document.getElementById(`end-${sourceDay}`).value;
+            days.forEach(day => {
+                const cb = document.getElementById(`check-${day}`);
+                if (cb.checked) {
+                    document.getElementById(`start-${day}`).value = start;
+                    document.getElementById(`end-${day}`).value   = end;
+                }
+            });
+            // Brief flash on the button for feedback
+            const btn = document.querySelector(`#row-${sourceDay} .copy-row-btn`);
+            if (btn) {
+                const original = btn.textContent;
+                btn.textContent = 'Done ✓';
+                btn.style.color = '#22c55e';
+                setTimeout(() => { btn.textContent = original; btn.style.color = ''; }, 1500);
+            }
+        }
 
         function showAlert(msg, type = 'success') {
             const alert = document.getElementById('alert-message');
@@ -281,9 +338,9 @@
                     const hours = JSON.parse(user.weekly_hours);
                     days.forEach(day => {
                         if (hours[day] && hours[day].length > 0) {
-                            document.getElementById(`check-${day}`).checked = true;
-                            document.getElementById(`start-${day}`).disabled = false;
-                            document.getElementById(`end-${day}`).disabled = false;
+                            const cb = document.getElementById(`check-${day}`);
+                            cb.checked = true;
+                            cb.dispatchEvent(new Event('change'));
                             document.getElementById(`start-${day}`).value = hours[day][0].start;
                             document.getElementById(`end-${day}`).value = hours[day][0].end;
                         }
