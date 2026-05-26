@@ -90,7 +90,8 @@ module.exports = {
 		'meet-schedule': true,     // Ephemeral - meeting scheduler
 		'meet-transcript': true,   // Ephemeral - transcript retrieval
 		'meet-start': true,        // Ephemeral - start meeting manually
-		'meet-reschedule': true    // Ephemeral - reschedule meeting
+		'meet-reschedule': true,   // Ephemeral - reschedule meeting
+		'ts-off': true             // Ephemeral - secret emergency recording abort
 	},
 
 	// 🎙️ MEETING RECORDING & TRANSCRIPTION
