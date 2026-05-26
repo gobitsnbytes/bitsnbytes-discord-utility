@@ -18,7 +18,9 @@ module.exports = {
 				// Check if the command already replied/deferred and if it's considered a success
 				// If the command caught its own error and edited the reply, it might still reach here.
 				// We'll trust the command.execute to throw if it's a true failure.
-				logger.command(interaction, 'SUCCESS');
+				if (!command.noLog) {
+					logger.command(interaction, 'SUCCESS');
+				}
 			} catch (error) {
 				// Don't log "Interaction has already been acknowledged" or "Unknown interaction" as a command error if it's just a duplicate process
 				if (error.code == 40060 || error.code == 10062) {
@@ -26,7 +28,9 @@ module.exports = {
 					return;
 				}
 
-				logger.command(interaction, 'ERROR', error);
+				if (!command.noLog) {
+					logger.command(interaction, 'ERROR', error);
+				}
 				
 				const errorEmbed = new EmbedBuilder()
 					.setTitle(`${config.EMOJIS.error} Protocol Breach`)
