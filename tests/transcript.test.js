@@ -187,3 +187,58 @@ describe('VcTextCollector Tests', () => {
 		expect(collected[0].content).toBe(' !hindi ');
 	});
 });
+
+describe('Speaker Timeline Coalescing & Formatting Tests', () => {
+	const { coalesceTimeline, formatMsToTimestamp } = require('../lib/transcriber');
+
+	test('should format milliseconds to MM:SS format correctly', () => {
+		expect(formatMsToTimestamp(0)).toBe('00:00');
+		expect(formatMsToTimestamp(5000)).toBe('00:05');
+		expect(formatMsToTimestamp(65000)).toBe('01:05');
+		expect(formatMsToTimestamp(3599000)).toBe('59:59');
+	});
+
+	test('should coalesce and filter speaking timeline events correctly', () => {
+		const sessionStartTime = 1000000;
+		const timeline = [
+			// User 1 speaks for 3s (1001000 to 1004000). Relative: 1s to 4s.
+			{ userId: 'user1', displayName: 'Alice', startTime: 1001000, endTime: 1004000 },
+			// User 1 speaks again after 1s gap (1005000 to 1008000). Relative: 5s to 8s. Should coalesce with previous!
+			{ userId: 'user1', displayName: 'Alice', startTime: 1005000, endTime: 1008000 },
+			// User 2 speaks for 4s (1003000 to 1007000). Relative: 3s to 7s.
+			{ userId: 'user2', displayName: 'Bob', startTime: 1003000, endTime: 1007000 },
+			// User 1 speaks after a large gap of 5s (1013000 to 1016000). Relative: 13s to 16s. Should NOT coalesce.
+			{ userId: 'user1', displayName: 'Alice', startTime: 1013000, endTime: 1016000 },
+			// Ultra short noise of 200ms from user2 (1010000 to 1010200). Should be filtered out.
+			{ userId: 'user2', displayName: 'Bob', startTime: 1010000, endTime: 1010200 },
+		];
+
+		const result = coalesceTimeline(timeline, sessionStartTime);
+
+		expect(result).toHaveLength(3);
+
+		expect(result[0]).toEqual({
+			displayName: 'Alice',
+			startMs: 1000,
+			endMs: 8000
+		});
+
+		expect(result[1]).toEqual({
+			displayName: 'Bob',
+			startMs: 3000,
+			endMs: 7000
+		});
+
+		expect(result[2]).toEqual({
+			displayName: 'Alice',
+			startMs: 13000,
+			endMs: 16000
+		});
+	});
+
+	test('should handle empty or null timelines gracefully', () => {
+		expect(coalesceTimeline(null, 1000)).toEqual([]);
+		expect(coalesceTimeline([], 1000)).toEqual([]);
+	});
+});
+
