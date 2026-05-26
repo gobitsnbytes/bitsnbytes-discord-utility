@@ -108,33 +108,37 @@
 					</div>
 
 					<!-- Reschedule Form (inline) -->
-					<div id="reschedule-form" class="meet-reschedule-form">
-						<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
-							<h4 style="margin: 0;">Reschedule Meeting</h4>
-							<button type="button" id="reschedule-cancel-btn" style="background: none; border: none; color: var(--muted-foreground); cursor: pointer; font-size: 1.2rem; padding: 0.25rem;">✕</button>
+					<div id="reschedule-form-wrapper" class="meet-reschedule-form-wrapper">
+						<div class="meet-reschedule-form-inner">
+							<div id="reschedule-form" class="meet-reschedule-form" style="display: block;">
+								<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+									<h4 style="margin: 0;">Reschedule Meeting</h4>
+									<button type="button" id="reschedule-cancel-btn" style="background: none; border: none; color: var(--muted-foreground); cursor: pointer; font-size: 1.2rem; padding: 0.25rem;">✕</button>
+								</div>
+								<div id="reschedule-auth-gate" style="display: none; text-align: center; padding: 1rem 0;">
+									<p style="color: var(--muted-foreground); font-size: 0.875rem; margin-bottom: 1rem;">You must be logged in to reschedule.</p>
+									<a href="#" id="reschedule-login-btn" class="btn btn-primary" style="text-decoration: none;">Login with Discord</a>
+								</div>
+								<form id="reschedule-form-inner" style="display: none;">
+									<div class="form-group">
+										<label for="reschedule-date">New Date</label>
+										<input type="date" id="reschedule-date" class="form-control" required>
+									</div>
+									<div class="form-group">
+										<label for="reschedule-time">New Time</label>
+										<input type="time" id="reschedule-time" class="form-control" required>
+									</div>
+									<div class="form-group">
+										<label for="reschedule-reason">Reason for Rescheduling</label>
+										<textarea id="reschedule-reason" class="form-control" placeholder="e.g. Conflict with another meeting, personal emergency..." required></textarea>
+									</div>
+									<div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.25rem;">
+										<button type="button" id="reschedule-back-btn" class="btn btn-secondary" style="font-size: 0.85rem;">Cancel</button>
+										<button type="submit" id="reschedule-submit-btn" class="btn btn-primary" style="font-size: 0.85rem;">Confirm Reschedule</button>
+									</div>
+								</form>
+							</div>
 						</div>
-						<div id="reschedule-auth-gate" style="display: none; text-align: center; padding: 1rem 0;">
-							<p style="color: var(--muted-foreground); font-size: 0.875rem; margin-bottom: 1rem;">You must be logged in to reschedule.</p>
-							<a href="#" id="reschedule-login-btn" class="btn btn-primary" style="text-decoration: none;">Login with Discord</a>
-						</div>
-						<form id="reschedule-form-inner" style="display: none;">
-							<div class="form-group">
-								<label for="reschedule-date">New Date</label>
-								<input type="date" id="reschedule-date" class="form-control" required>
-							</div>
-							<div class="form-group">
-								<label for="reschedule-time">New Time</label>
-								<input type="time" id="reschedule-time" class="form-control" required>
-							</div>
-							<div class="form-group">
-								<label for="reschedule-reason">Reason for Rescheduling</label>
-								<textarea id="reschedule-reason" class="form-control" placeholder="e.g. Conflict with another meeting, personal emergency..." required></textarea>
-							</div>
-							<div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.25rem;">
-								<button type="button" id="reschedule-back-btn" class="btn btn-secondary" style="font-size: 0.85rem;">Cancel</button>
-								<button type="submit" id="reschedule-submit-btn" class="btn btn-primary" style="font-size: 0.85rem;">Confirm Reschedule</button>
-							</div>
-						</form>
 					</div>
 				</div>
 			</div>
@@ -145,8 +149,12 @@
 					<span>📋 Reschedule History</span>
 					<span id="history-arrow">▼</span>
 				</button>
-				<div id="history-list" class="meet-history-list">
-					<!-- Dynamically populated -->
+				<div id="history-list-wrapper" class="meet-history-list-wrapper">
+					<div class="meet-history-list-inner">
+						<div id="history-list" class="meet-history-list" style="display: block;">
+							<!-- Dynamically populated -->
+						</div>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -312,14 +320,14 @@
 				if (!canReschedule && !isAuthenticated) {
 					// Show login gate when clicked
 					rescheduleBtn.addEventListener('click', () => {
-						document.getElementById('reschedule-form').classList.add('active');
+						document.getElementById('reschedule-form-wrapper').classList.add('active');
 						document.getElementById('reschedule-auth-gate').style.display = 'block';
 						document.getElementById('reschedule-form-inner').style.display = 'none';
 						document.getElementById('reschedule-login-btn').href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
 					});
 				} else if (canReschedule) {
 					rescheduleBtn.addEventListener('click', () => {
-						document.getElementById('reschedule-form').classList.add('active');
+						document.getElementById('reschedule-form-wrapper').classList.add('active');
 						document.getElementById('reschedule-auth-gate').style.display = 'none';
 						document.getElementById('reschedule-form-inner').style.display = 'block';
 					});
@@ -416,18 +424,18 @@
 
 		// Reschedule form handlers
 		document.getElementById('reschedule-cancel-btn').addEventListener('click', () => {
-			document.getElementById('reschedule-form').classList.remove('active');
+			document.getElementById('reschedule-form-wrapper').classList.remove('active');
 		});
 		document.getElementById('reschedule-back-btn')?.addEventListener('click', () => {
-			document.getElementById('reschedule-form').classList.remove('active');
+			document.getElementById('reschedule-form-wrapper').classList.remove('active');
 		});
 
 		// History toggle
 		document.getElementById('history-toggle').addEventListener('click', () => {
-			const list = document.getElementById('history-list');
+			const wrapper = document.getElementById('history-list-wrapper');
 			const arrow = document.getElementById('history-arrow');
-			list.classList.toggle('active');
-			arrow.textContent = list.classList.contains('active') ? '▲' : '▼';
+			wrapper.classList.toggle('active');
+			arrow.textContent = wrapper.classList.contains('active') ? '▲' : '▼';
 		});
 
 		// Reschedule form submission
@@ -456,7 +464,7 @@
 				if (res.ok) {
 					const result = await res.json();
 					meetingData = result.meeting;
-					document.getElementById('reschedule-form').classList.remove('active');
+					document.getElementById('reschedule-form-wrapper').classList.remove('active');
 					renderMeeting();
 					// Show success feedback
 					const btn = document.getElementById('reschedule-btn');

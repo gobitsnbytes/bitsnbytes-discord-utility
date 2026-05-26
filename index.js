@@ -5,6 +5,7 @@ require('./lib/cleanEmbeds');
 require('dotenv').config();
 const logger = require('./lib/logger');
 const { getGitInfo } = require('./lib/git');
+const db = require('./lib/db');
 
 const client = new Client({
 	intents: [
@@ -48,10 +49,17 @@ for (const file of eventFiles) {
 	const filePath = path.join(eventsPath, file);
 	try {
 		const event = require(filePath);
+		const executeWrapper = async (...args) => {
+			try {
+				await event.execute(...args);
+			} catch (err) {
+				logger.error(`Error in event listener ${event.name}`, err);
+			}
+		};
 		if (event.once) {
-			client.once(event.name, (...args) => event.execute(...args));
+			client.once(event.name, executeWrapper);
 		} else {
-			client.on(event.name, (...args) => event.execute(...args));
+			client.on(event.name, executeWrapper);
 		}
 	} catch (err) {
 		logger.error(`Failed to load event ${file}`, err);
@@ -154,3 +162,18 @@ client.login(process.env.DISCORD_TOKEN).catch(err => {
 	logger.error('Login failed', err);
 	process.exit(1);
 });
+
+// Graceful shutdown
+const handleShutdown = () => {
+	logger.boot('Shutdown signal received. Closing database connections...', null, false);
+	try {
+		db.close();
+		logger.boot('Database connections closed successfully. Exiting.', null, false);
+	} catch (err) {
+		logger.error('Error closing database connections during shutdown', err);
+	}
+	process.exit(0);
+};
+
+process.on('SIGINT', handleShutdown);
+process.on('SIGTERM', handleShutdown);

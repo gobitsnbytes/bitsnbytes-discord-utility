@@ -746,6 +746,8 @@ bits-bytes-bot/
 
 | Date | Bug | Fix |
 |------|-----|-----|
+| 2026-05-26 | UI Craft & Motion Polish | Implemented Cal.com-style inline scheduling form transitions, grid-based height animations for collapsible sections/forms, and color/typography polish |
+| 2026-05-26 | Role Scoping & Dynamic Routing | Implemented dynamic fork routing, collapsible role menus, and fine-grained scoped instant meets |
 | 2026-05-26 | SQLite ALTER TABLE UNIQUE bug | Splitted `ALTER TABLE ADD COLUMN meet_code TEXT UNIQUE` into ADD COLUMN + CREATE UNIQUE INDEX |
 | 2026-04-29 | Report reminder overdue logic | Fixed date comparison - now checks on 1st of new month for missed reports |
 | 2026-04-29 | Event description optional | Made description required per spec |

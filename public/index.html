@@ -81,6 +81,8 @@
 
     <script>
         let selectedHosts = [];
+        let currentCityContext = null;
+        let currentUserInfo = null;
 
         function updateSelectionBar() {
             const bar = document.getElementById('selection-bar');
@@ -107,8 +109,99 @@
             window.location.href = `/${primary}?hosts=${handles}`;
         }
 
+        function renderUserCard(user) {
+            const avatarLetter = user.title ? user.title.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase();
+            const avatarContent = user.avatar
+                ? `<img src="https://cdn.discordapp.com/avatars/${user.discord_id}/${user.avatar}.png?size=128" alt="${user.title || user.username}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`
+                : avatarLetter;
+            
+            let roleLabel = 'Contributor';
+            if (user.role === 'exec_leader') roleLabel = 'Executive Leadership';
+            else if (user.role === 'dep_lead') roleLabel = 'Department Lead';
+            else if (user.role === 'fork_lead') roleLabel = `Fork Lead (${user.cityName || 'Active'})`;
+            
+            return `
+                <div class="user-card" data-id="${user.discord_id}">
+                    <div style="position: absolute; top: 1.25rem; right: 1.25rem; z-index: 10;">
+                        <input type="checkbox" class="host-checkbox" data-link="${user.booking_link}" data-title="${user.title || user.username}" onchange="updateSelectionBar()" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--brand);">
+                    </div>
+                    <div>
+                        <div class="user-card-header">
+                            <div class="user-avatar">${avatarContent}</div>
+                            <div class="user-meta">
+                                <h3>${user.title || user.username}</h3>
+                                <span class="role-type-badge">${roleLabel}</span>
+                            </div>
+                        </div>
+                        <div class="user-card-body">
+                            ${user.description || 'Active member at Bits&Bytes. Book a session to sync on projects, events, or operations.'}
+                        </div>
+                    </div>
+                    <div class="user-card-footer">
+                        <span class="timezone-badge">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                                <path d="M2 12h20"></path>
+                            </svg>
+                            ${user.timezone}
+                        </span>
+                        <a href="/${user.booking_link}" class="btn btn-primary" style="padding: 0.4rem 1rem; font-size: 0.85rem; font-weight: 700;">Book Session</a>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSection(title, cardsHtml, isCollapsed = false, icon = '📁') {
+            if (!cardsHtml) return '';
+            const collapsedClass = isCollapsed ? 'collapsed' : '';
+            return `
+                <div class="collapsible-section ${collapsedClass}">
+                    <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                        <h2><span>${icon}</span> ${title}</h2>
+                        <span class="chevron">▼</span>
+                    </div>
+                    <div class="collapsible-wrapper">
+                        <div class="collapsible-inner">
+                            <div class="section-content users-grid">
+                                ${cardsHtml}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         async function loadHosts() {
             try {
+                // Detect city context from pathname
+                const specialPaths = ['', 'index.html', 'dashboard', 'dashboard.html', 'book.html', 'login', 'logout', 'm'];
+                const pathParts = window.location.pathname.split('/').filter(Boolean);
+                const cityContext = pathParts.length === 1 && !specialPaths.includes(pathParts[0].toLowerCase()) 
+                    ? pathParts[0] 
+                    : null;
+                
+                currentCityContext = cityContext;
+
+                if (cityContext) {
+                    const cityNameFormatted = cityContext.charAt(0).toUpperCase() + cityContext.slice(1);
+                    document.querySelector('.hero-section h1').textContent = `Schedule a Meeting with the ${cityNameFormatted} Fork`;
+                    document.querySelector('.hero-section .subtitle').textContent = `Select a member of the ${cityNameFormatted} Fork below to book a sync. Meetings are hosted on our official Discord voice infrastructure.`;
+                }
+
+                // Check profile
+                let me = null;
+                try {
+                    const meRes = await fetch('/api/user/me');
+                    if (meRes.ok) {
+                        me = await meRes.json();
+                        currentUserInfo = me;
+                    }
+                } catch (e) {
+                    console.warn('Profile fetch failed', e);
+                }
+
+                // Fetch hosts
                 const res = await fetch('/api/users');
                 const users = await res.json();
                 
@@ -125,44 +218,131 @@
                     `;
                     return;
                 }
-                
-                users.forEach(user => {
-                    const avatarLetter = user.title ? user.title.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase();
-                    const avatarContent = user.avatar
-                        ? `<img src="https://cdn.discordapp.com/avatars/${user.discord_id}/${user.avatar}.png?size=128" alt="${user.title || user.username}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`
-                        : avatarLetter;
-                    const card = document.createElement('div');
-                    card.className = 'user-card';
-                    card.innerHTML = `
-                        <div style="position: absolute; top: 1.25rem; right: 1.25rem; z-index: 10;">
-                            <input type="checkbox" class="host-checkbox" data-link="${user.booking_link}" data-title="${user.title || user.username}" onchange="updateSelectionBar()" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--brand);">
-                        </div>
-                        <div>
-                            <div class="user-card-header">
-                                <div class="user-avatar">${avatarContent}</div>
-                                <div class="user-meta">
-                                    <h3>${user.title || user.username}</h3>
-                                    <span>@${user.booking_link}</span>
-                                </div>
+
+                // If in a city context, filter and render fork page
+                if (cityContext) {
+                    const forkUsers = users.filter(u => u.cityName && u.cityName.toLowerCase() === cityContext.toLowerCase());
+                    
+                    if (forkUsers.length === 0) {
+                        grid.innerHTML = `
+                            <div class="empty-state" style="grid-column: 1 / -1;">
+                                <div class="empty-icon">📭</div>
+                                <h2>No team members registered for this Fork yet</h2>
+                                <p>Check back later or register availability if you are a lead of this fork.</p>
                             </div>
-                            <div class="user-card-body">
-                                ${user.description || 'Active member at Bits&Bytes. Book a session to sync on projects, events, or operations.'}
+                        `;
+                        return;
+                    }
+
+                    // For fork specific page, display Fork Lead and Fork Team sections
+                    const leadUsers = forkUsers.filter(u => u.role === 'fork_lead');
+                    const teamUsers = forkUsers.filter(u => u.role !== 'fork_lead');
+
+                    let html = '';
+                    html += renderSection('Fork Leadership', leadUsers.map(renderUserCard).join(''), false, '👑');
+                    html += renderSection('Fork Team Members', teamUsers.map(renderUserCard).join(''), false, '👥');
+                    grid.innerHTML = html;
+                    grid.style.display = 'block';
+                    return;
+                }
+
+                // HOME SCREEN (cityContext is null)
+                grid.style.display = 'block';
+
+                if (!me) {
+                    // STRANGER VIEW (not logged in)
+                    // Section 1: Bits&Bytes (only Exec/Dep leads)
+                    const coreUsers = users.filter(u => u.role === 'exec_leader' || u.role === 'dep_lead');
+                    
+                    // Section 2: Bits&Bytes Forks (collapsible)
+                    const forkUsers = users.filter(u => u.cityName);
+                    
+                    const forksMap = {};
+                    forkUsers.forEach(u => {
+                        const city = u.cityName;
+                        if (!forksMap[city]) forksMap[city] = [];
+                        forksMap[city].push(u);
+                    });
+
+                    let forksHtml = '';
+                    Object.entries(forksMap).forEach(([city, cityUsers]) => {
+                        forksHtml += `
+                            <div style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem;">
+                                <h3 style="font-size: 1rem; margin-bottom: 1rem; color: var(--muted-foreground);">📍 ${city} Fork</h3>
+                                <div class="users-grid">${cityUsers.map(renderUserCard).join('')}</div>
                             </div>
-                        </div>
-                        <div class="user-card-footer">
-                            <span class="timezone-badge">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                                    <path d="M2 12h20"></path>
-                                </svg>
-                                ${user.timezone}
-                            </span>
-                            <a href="/${user.booking_link}" class="btn btn-primary" style="padding: 0.4rem 1rem; font-size: 0.85rem; font-weight: 700;">Book Session</a>
+                        `;
+                    });
+
+                    let finalHtml = '';
+                    finalHtml += renderSection('Bits&Bytes Leadership', coreUsers.map(renderUserCard).join(''), false, '👑');
+                    finalHtml += renderSection('Bits&Bytes Forks', forksHtml || '<p style="font-size:0.9rem; color:var(--muted-foreground); margin:0;">No forks registered yet.</p>', true, '📍');
+                    
+                    grid.innerHTML = finalHtml;
+                } else {
+                    // LOGGED-IN TEAM MEMBER VIEW
+                    // Section 1: Bits&Bytes (Exec/Dep Leadership vs Contributors)
+                    const coreLeads = users.filter(u => u.role === 'exec_leader' || u.role === 'dep_lead');
+                    const coreContributors = users.filter(u => u.role === 'contributor' && !u.cityName);
+
+                    // Section 2: Forks (collapsible, showing whole team for own, just lead for others)
+                    const forkUsers = users.filter(u => u.cityName);
+                    
+                    const forksMap = {};
+                    forkUsers.forEach(u => {
+                        const city = u.cityName;
+                        if (!forksMap[city]) forksMap[city] = [];
+                        forksMap[city].push(u);
+                    });
+
+                    const myCity = me.cityName;
+                    let forksHtml = '';
+
+                    Object.entries(forksMap).forEach(([city, cityUsers]) => {
+                        const isMyCity = myCity && city.toLowerCase() === myCity.toLowerCase();
+                        let filteredCityUsers = cityUsers;
+                        let noticeText = '';
+                        
+                        if (!isMyCity) {
+                            // Scoped access: strangers and members from other forks only see Fork Lead
+                            filteredCityUsers = cityUsers.filter(u => u.role === 'fork_lead');
+                            if (cityUsers.length > filteredCityUsers.length) {
+                                noticeText = `<p style="font-size: 0.8rem; color: var(--muted-foreground); margin-bottom: 0.8rem;">ℹ️ Restricting view to Fork Lead. Logged-in team members only see their own fork's full team structure.</p>`;
+                            }
+                        }
+
+                        forksHtml += `
+                            <div style="margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1.5rem;">
+                                <h3 style="font-size: 1rem; margin-bottom: 0.5rem; color: ${isMyCity ? 'var(--brand)' : 'var(--primary)'};">
+                                    📍 ${city} Fork ${isMyCity ? '(My Fork)' : ''}
+                                </h3>
+                                ${noticeText}
+                                <div class="users-grid">${filteredCityUsers.map(renderUserCard).join('')}</div>
+                            </div>
+                        `;
+                    });
+
+                    let finalHtml = '';
+                    const coreLeadsHtml = renderSection('Executive & Department Leadership', coreLeads.map(renderUserCard).join(''), false, '👑');
+                    const coreContribsHtml = renderSection('Contributors', coreContributors.map(renderUserCard).join(''), true, '👥');
+                    
+                    finalHtml += `
+                        <div class="collapsible-section">
+                            <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                                <h2>💼 Bits&Bytes Core Team</h2>
+                                <span class="chevron">▼</span>
+                            </div>
+                            <div class="section-content" style="padding: 1.75rem 1.75rem 0.5rem 1.75rem;">
+                                ${coreLeadsHtml}
+                                ${coreContribsHtml}
+                            </div>
                         </div>
                     `;
-                    grid.appendChild(card);
-                });
+
+                    finalHtml += renderSection('Forks Network', forksHtml || '<p style="font-size:0.9rem; color:var(--muted-foreground); margin:0;">No forks registered yet.</p>', false, '📍');
+                    
+                    grid.innerHTML = finalHtml;
+                }
             } catch (err) {
                 console.error('Failed to load hosts:', err);
                 document.getElementById('hosts-grid').innerHTML = `
@@ -197,10 +377,8 @@
                         </a>
                     `;
 
-                    // Show instant meeting launcher for contributors
-                    if (user.isContributor) {
-                        document.getElementById('instant-meet-launcher').classList.add('visible');
-                    }
+                    // Instant meeting launcher visible to all server members
+                    document.getElementById('instant-meet-launcher').classList.add('visible');
                 }
             } catch (err) {
                 console.warn('OAuth check failed:', err);
@@ -219,13 +397,17 @@
             btn.disabled = true;
             btn.textContent = 'Creating...';
             try {
+                const payload = { title, scope };
+                if (currentCityContext) {
+                    payload.city = currentCityContext;
+                }
                 const res = await fetch('/api/instant-meeting', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, scope })
+                    body: JSON.stringify(payload)
                 });
                 const data = await res.json();
-                if (data.success) {
+                if (res.ok && data.meetUrl) {
                     document.getElementById('instant-meet-link').textContent = data.meetUrl;
                     document.getElementById('instant-meet-result').classList.add('visible');
                     document.getElementById('instant-title').value = '';
@@ -265,19 +447,15 @@
             try {
                 const reg = await navigator.serviceWorker.register('/sw.js');
                 
-                // Only subscribe if logged in
                 const meRes = await fetch('/api/user/me');
                 if (!meRes.ok) return;
 
-                // Get VAPID key
                 const keyRes = await fetch('/api/push/vapid-key');
                 if (!keyRes.ok) return;
                 const { publicKey } = await keyRes.json();
 
-                // Check existing subscription
                 let subscription = await reg.pushManager.getSubscription();
                 if (!subscription) {
-                    // Request permission
                     const permission = await Notification.requestPermission();
                     if (permission !== 'granted') return;
 
@@ -287,7 +465,6 @@
                     });
                 }
 
-                // Send to server
                 await fetch('/api/push/subscribe', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

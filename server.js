@@ -114,12 +114,30 @@ function startWebServer(client) {
             });
         }
 
-        const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify+email+guilds.join`;
+        // Generate state token for CSRF protection
+        const state = crypto.randomBytes(16).toString('hex');
+        res.cookie('oauth_state', state, { 
+            maxAge: 10 * 60 * 1000, // 10 minutes
+            httpOnly: true,
+            secure: req.secure || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/'
+        });
+
+        const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify+email+guilds.join&state=${state}`;
         res.redirect(discordAuthUrl);
     });
 
     app.get('/auth/callback', async (req, res) => {
-        const { code } = req.query;
+        const { code, state } = req.query;
+        const cookieState = req.cookies.oauth_state;
+
+        if (!state || !cookieState || state !== cookieState) {
+            return res.status(400).send('OAuth Error: State parameter validation failed.');
+        }
+
+        res.clearCookie('oauth_state');
+
         if (!code) {
             return res.status(400).send('OAuth Error: Missing authorization code.');
         }
@@ -344,6 +362,37 @@ function startWebServer(client) {
     // API ENDPOINTS
     // ============================================
 
+    async function resolveMemberRoleAndCity(discordId, associatedRoleId) {
+        let role = 'contributor';
+        let cityName = null;
+        const targetGuildId = process.env.GUILD_ID || '1480617556292272260';
+        const guild = client.guilds.cache.get(targetGuildId) || await client.guilds.fetch(targetGuildId).catch(() => null);
+        if (guild) {
+            const member = await guild.members.fetch(discordId).catch(() => null);
+            if (member) {
+                if (member.roles.cache.has('1506019032015310949')) {
+                    role = 'exec_leader';
+                } else if (member.roles.cache.has('1506323726223016149')) {
+                    role = 'dep_lead';
+                } else if (member.roles.cache.has(process.env.FORK_LEAD_ROLE_ID || '1490410901147488286')) {
+                    role = 'fork_lead';
+                }
+                
+                const roleIdToCheck = associatedRoleId || (role === 'fork_lead' ? member.roles.cache.find(r => 
+                    r.name.toLowerCase() !== 'contributor' && r.name.toLowerCase() !== 'fork-lead' && r.name.toLowerCase() !== 'everyone'
+                )?.id : null);
+                
+                if (roleIdToCheck) {
+                    const roleObj = guild.roles.cache.get(roleIdToCheck);
+                    if (roleObj) {
+                        cityName = roleObj.name;
+                    }
+                }
+            }
+        }
+        return { role, cityName };
+    }
+
     app.get('/api/user/me', checkAuth, async (req, res) => {
         try {
             let user = await db.get(`SELECT * FROM user_availability WHERE discord_id = ?`, [req.user.id]);
@@ -357,14 +406,18 @@ function startWebServer(client) {
                 isContributor = member ? member.roles.cache.some(r => r.name.toLowerCase() === 'contributor') : false;
             }
 
+            const { role, cityName } = await resolveMemberRoleAndCity(req.user.id, user ? user.associated_role_id : null);
+
             if (user) {
                 if (user.associated_role_id && guild) {
-                    const role = guild.roles.cache.get(user.associated_role_id);
-                    if (role) {
-                        user.associated_role_name = role.name;
+                    const rObj = guild.roles.cache.get(user.associated_role_id);
+                    if (rObj) {
+                        user.associated_role_name = rObj.name;
                     }
                 }
                 user.isContributor = isContributor;
+                user.role = role;
+                user.cityName = cityName;
             } else {
                 user = {
                     discord_id: req.user.id,
@@ -372,11 +425,14 @@ function startWebServer(client) {
                     email: req.user.email,
                     avatar: req.user.avatar || null,
                     isGuest: true,
-                    isContributor
+                    isContributor,
+                    role,
+                    cityName
                 };
             }
             res.json(user);
         } catch (err) {
+            console.error('[API_USER_ME_ERROR]', err);
             res.status(500).json({ error: 'Failed to retrieve profile' });
         }
     });
@@ -392,6 +448,15 @@ function startWebServer(client) {
         // Validate booking link format
         if (!/^[a-zA-Z0-9-_]+$/.test(booking_link)) {
             return res.status(400).json({ error: 'Invalid booking handle characters' });
+        }
+
+        // Validate timezone format
+        if (timezone) {
+            try {
+                Intl.DateTimeFormat(undefined, { timeZone: timezone });
+            } catch (e) {
+                return res.status(400).json({ error: 'Invalid timezone name' });
+            }
         }
 
         try {
@@ -438,8 +503,17 @@ function startWebServer(client) {
     app.get('/api/users', async (req, res) => {
         try {
             const users = await db.all(`SELECT discord_id, username, title, booking_link, description, timezone, weekly_hours, calcom_event_type_id, associated_role_id, avatar FROM user_availability WHERE booking_link IS NOT NULL`);
-            res.json(users);
+            const resolvedUsers = await Promise.all(users.map(async (u) => {
+                const { role, cityName } = await resolveMemberRoleAndCity(u.discord_id, u.associated_role_id);
+                return {
+                    ...u,
+                    role,
+                    cityName
+                };
+            }));
+            res.json(resolvedUsers);
         } catch (err) {
+            console.error('[API_USERS_ERROR]', err);
             res.status(500).json({ error: 'Database query failed' });
         }
     });
@@ -539,6 +613,12 @@ function startWebServer(client) {
 
         if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
             return res.status(400).json({ error: 'Valid date parameter YYYY-MM-DD required' });
+        }
+
+        // Validate calendar date correctness
+        const checkDate = new Date(`${date}T00:00:00+05:30`);
+        if (isNaN(checkDate.getTime())) {
+            return res.status(400).json({ error: 'Invalid calendar date' });
         }
 
         try {
@@ -779,21 +859,22 @@ function startWebServer(client) {
         }
     });
 
-    // API: Create instant meeting (contributors only)
+    // API: Create instant meeting
     app.post('/api/instant-meeting', checkAuth, async (req, res) => {
         try {
-            const { title, description, scope } = req.body;
+            const { title, description, scope, city } = req.body;
             if (!title) {
                 return res.status(400).json({ error: 'Meeting title is required.' });
             }
 
-            // Verify contributor role
-            const guild = client.guilds.cache.first();
+            // Verify member of the guild
+            const guildId = process.env.GUILD_ID || '1480617556292272260';
+            const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
             if (!guild) return res.status(500).json({ error: 'Guild not found.' });
 
             const member = await guild.members.fetch(req.user.id).catch(() => null);
-            if (!member || !member.roles.cache.some(r => r.name.toLowerCase() === 'contributor')) {
-                return res.status(403).json({ error: 'Only contributors can create instant meetings.' });
+            if (!member) {
+                return res.status(403).json({ error: 'Only server members can create instant meetings.' });
             }
 
             const id = `meet_instant_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -814,6 +895,29 @@ function startWebServer(client) {
             });
 
             await meetingsDb.addAttendee(id, 'user', req.user.id);
+
+            // If a fork city is specified, add all team members of that fork as attendees
+            if (city) {
+                try {
+                    const notion = require('./lib/notion');
+                    const forks = await notion.getForks().catch(() => []);
+                    const matchedFork = forks.find(f => {
+                        const cName = notion.getCityName(f);
+                        return cName && cName.toLowerCase() === city.toLowerCase();
+                    });
+                    
+                    if (matchedFork) {
+                        const members = await notion.getTeamMembers(matchedFork.id).catch(() => []);
+                        for (const tm of members) {
+                            if (tm.discordId && tm.discordId !== req.user.id) {
+                                await meetingsDb.addAttendee(id, 'user', tm.discordId).catch(() => {});
+                            }
+                        }
+                    }
+                } catch (forkErr) {
+                    console.error('[INSTANT_MEETING] Failed to add fork team members:', forkErr.message);
+                }
+            }
 
             // Create VC immediately
             const createdMeeting = await meetingsDb.getMeeting(id);
@@ -844,7 +948,7 @@ function startWebServer(client) {
                     await eventsChannel.send({
                         content: `⚡ **Instant Meeting Started**: <@${req.user.id}>`,
                         embeds: [embed]
-                    });
+                    }).catch(() => {});
                 }
             }
 
@@ -856,7 +960,7 @@ function startWebServer(client) {
                 guildId: guild.id
             });
         } catch (err) {
-            console.error('[INSTANT_MEETING_ERROR]', err);
+            console.error('[INSTANT_MEET_ERROR]', err);
             res.status(500).json({ error: 'Failed to create instant meeting.' });
         }
     });
@@ -916,16 +1020,29 @@ function startWebServer(client) {
     // BOOKING PAGE (dynamic host handle routes)
     // ============================================
 
-    // Book a meeting slot
+    // Book a meeting slot or view a fork page
     app.get('/:bookingLink', async (req, res, next) => {
         const { bookingLink } = req.params;
         try {
+            // 1. Check if bookingLink matches a user booking handle
             const host = await db.get(`SELECT 1 FROM user_availability WHERE booking_link = ?`, [bookingLink]);
             if (host) {
-                res.sendFile(path.join(__dirname, 'public/book.html'));
-            } else {
-                next();
+                return res.sendFile(path.join(__dirname, 'public/book.html'));
             }
+
+            // 2. Check if bookingLink matches an active city name in Notion
+            const notion = require('./lib/notion');
+            const forks = await notion.getForks().catch(() => []);
+            const matchedCity = forks.some(f => {
+                const cName = notion.getCityName(f);
+                return cName && cName.toLowerCase() === bookingLink.toLowerCase();
+            });
+
+            if (matchedCity) {
+                return res.sendFile(path.join(__dirname, 'public/index.html'));
+            }
+
+            next();
         } catch (err) {
             next();
         }
@@ -961,6 +1078,11 @@ function startWebServer(client) {
                 const offset = OFFSETS[primaryHost.timezone] || '+05:30';
                 const slotStartISO = `${date}T${slot}:00${offset}`;
                 startTimeMs = Date.parse(slotStartISO);
+                
+                if (isNaN(startTimeMs)) {
+                    return res.status(400).json({ error: 'Invalid meeting date or slot format.' });
+                }
+
                 endTimeMs = startTimeMs + selectedDuration * 60 * 1000;
 
                 if (startTimeMs <= Date.now()) {
@@ -1001,6 +1123,48 @@ function startWebServer(client) {
             // Create the meeting record
             const id = `meet_calweb_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
             
+            let finalDescription = description || `Custom scheduled session via cal.gobitsnbytes.org.\nInvitee: ${name} (${email})`;
+            if (notes) {
+                finalDescription += `\n\nNotes from booker:\n${notes}`;
+            }
+
+            // List of host names for meeting title
+            const hostTitles = allHosts.map(h => h.title || h.username).join(', ');
+
+            const newMeeting = {
+                id,
+                title: `${hostTitles} <> ${name}: ${title}`,
+                description: finalDescription,
+                scheduledTime: startTimeMs,
+                locationType: 'discord_vc',
+                locationDetails: '',
+                creatorId: primaryHost.discord_id,
+                bookedBy: req.user.id,
+                status: instant ? 'pending' : 'booking_in_progress',
+                endTime: endTimeMs,
+                externalEmails: [email.trim().toLowerCase()],
+                calcomBookingId: null,
+                calcomUid: null
+            };
+
+            // Write the hold lock meeting record to database immediately to block concurrent bookings!
+            await meetingsDb.createMeeting(newMeeting);
+            
+            // Add all hosts as attendees
+            for (const host of allHosts) {
+                await meetingsDb.addAttendee(id, 'user', host.discord_id);
+            }
+
+            // Add the authenticated guest as an attendee
+            await meetingsDb.addAttendee(id, 'user', req.user.id);
+
+            // Invite the whole fork if requested and host has role mapping
+            for (const host of allHosts) {
+                if (inviteWholeFork && host.associated_role_id) {
+                    await meetingsDb.addAttendee(id, 'role', host.associated_role_id);
+                }
+            }
+
             // Push booking to Cal.com using duration-based event type routing.
             let calcomBookingId = null;
             if (!instant) {
@@ -1036,50 +1200,21 @@ function startWebServer(client) {
                             console.log(`[CALCOM] Booking created: ${calcomBookingId} (${duration}min event type ${calcomEventTypeId})`);
                         }
                     } catch (calcomErr) {
-                        console.warn('[CALCOM] Web booking sync failed (non-fatal):', calcomErr.message);
+                        console.warn('[CALCOM] Web booking sync failed:', calcomErr.message);
+                        // Clean up hold meeting from DB to release lock
+                        await db.run(`DELETE FROM meetings WHERE id = ?`, [id]);
+                        await db.run(`DELETE FROM meeting_attendees WHERE meeting_id = ?`, [id]);
+                        return res.status(500).json({ error: 'Failed to synchronize booking with Cal.com.' });
                     }
                 }
-            }
 
-            let finalDescription = description || `Custom scheduled session via cal.gobitsnbytes.org.\nInvitee: ${name} (${email})`;
-            if (notes) {
-                finalDescription += `\n\nNotes from booker:\n${notes}`;
-            }
-
-            // List of host names for meeting title
-            const hostTitles = allHosts.map(h => h.title || h.username).join(', ');
-
-            const newMeeting = {
-                id,
-                title: `${hostTitles} <> ${name}: ${title}`,
-                description: finalDescription,
-                scheduledTime: startTimeMs,
-                locationType: 'discord_vc',
-                locationDetails: '',
-                creatorId: primaryHost.discord_id,
-                bookedBy: req.user.id,
-                status: instant ? 'pending' : 'scheduled',
-                endTime: endTimeMs,
-                externalEmails: [email.trim().toLowerCase()],
-                calcomBookingId,
-                calcomUid: calcomBookingId
-            };
-
-            await meetingsDb.createMeeting(newMeeting);
-            
-            // Add all hosts as attendees
-            for (const host of allHosts) {
-                await meetingsDb.addAttendee(id, 'user', host.discord_id);
-            }
-
-            // Add the authenticated guest as an attendee
-            await meetingsDb.addAttendee(id, 'user', req.user.id);
-
-            // Invite the whole fork if requested and host has role mapping
-            for (const host of allHosts) {
-                if (inviteWholeFork && host.associated_role_id) {
-                    await meetingsDb.addAttendee(id, 'role', host.associated_role_id);
-                }
+                // Update hold meeting to scheduled status
+                await db.run(
+                    `UPDATE meetings 
+                     SET status = 'scheduled', calcom_booking_id = ?, calcom_uid = ? 
+                     WHERE id = ?`,
+                    [calcomBookingId, calcomBookingId, id]
+                );
             }
 
             // Announce to events channel if bot client is logged in
@@ -1369,15 +1504,20 @@ function startWebServer(client) {
 
     if (client.isReady()) {
         runUserCleanup(client);
+        runBookingHoldsCleanup();
     } else {
         client.once('ready', () => {
             runUserCleanup(client);
+            runBookingHoldsCleanup();
         });
     }
 
     setInterval(() => {
         if (client.isReady()) {
             runUserCleanup(client).catch(err => {
+                console.error('[CLEANUP_ERROR]', err);
+            });
+            runBookingHoldsCleanup().catch(err => {
                 console.error('[CLEANUP_ERROR]', err);
             });
         }
@@ -1423,4 +1563,24 @@ async function runUserCleanup(client) {
     }
 }
 
-module.exports = { startWebServer, runUserCleanup, sessions };
+async function runBookingHoldsCleanup() {
+    try {
+        const expireTime = Date.now() - 10 * 60 * 1000; // 10 minutes ago
+        const expiredHolds = await db.all(
+            `SELECT id FROM meetings WHERE status = 'booking_in_progress' AND created_at < ?`,
+            [expireTime]
+        );
+        if (expiredHolds.length > 0) {
+            console.log(`[CLEANUP] Found ${expiredHolds.length} expired booking holds. Cleaning up...`);
+            const ids = expiredHolds.map(h => h.id);
+            const placeholders = ids.map(() => '?').join(',');
+            await db.run(`DELETE FROM meeting_attendees WHERE meeting_id IN (${placeholders})`, ids);
+            await db.run(`DELETE FROM meetings WHERE id IN (${placeholders})`, ids);
+            console.log(`[CLEANUP] Expired booking holds removed successfully.`);
+        }
+    } catch (err) {
+        console.error('[CLEANUP] Failed to run booking holds cleanup:', err);
+    }
+}
+
+module.exports = { startWebServer, runUserCleanup, runBookingHoldsCleanup, sessions };
