@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Meeting // Bits&Bytes Scheduler</title>
+	<meta name="description" content="View meeting details, join the voice channel, or reschedule — Bits&Bytes Scheduler">
+	<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+	<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+	<header>
+		<div class="logo-container">
+			<img src="https://gobitsnbytes.org/logo" alt="Bits&Bytes Logo">
+			<span class="logo-text">bits&bytes // scheduler</span>
+		</div>
+		<div class="nav-links">
+			<a href="/" class="btn btn-secondary">Home</a>
+		</div>
+	</header>
+
+	<main>
+		<!-- Loading State -->
+		<div id="loading-state" class="glass-card" style="text-align: center; max-width: 500px; margin: 0 auto;">
+			<p style="color: var(--muted-foreground); font-size: 0.9rem;">Loading meeting details...</p>
+		</div>
+
+		<!-- Error State -->
+		<div id="error-state" style="display: none;">
+			<div class="glass-card" style="text-align: center; max-width: 500px; margin: 0 auto;">
+				<div style="font-size: 2.5rem; margin-bottom: 1rem;">🔍</div>
+				<h2 style="color: var(--error); margin-bottom: 0.5rem;">Meeting Not Found</h2>
+				<p id="error-message" style="color: var(--muted-foreground); font-size: 0.875rem; margin-bottom: 1.5rem;">The meeting code does not match any scheduled session.</p>
+				<a href="/" class="btn btn-secondary">Return Home</a>
+			</div>
+		</div>
+
+		<!-- Meeting Card -->
+		<div id="meeting-view" style="display: none;">
+			<div class="meet-card">
+				<!-- Left Column: Attendees -->
+				<div class="meet-attendees-col">
+					<div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; color: var(--muted-foreground); font-size: 0.85rem; font-weight: 700;">
+						<img src="https://gobitsnbytes.org/logo" alt="Bits&Bytes" style="height: 18px; width: auto;">
+						<span>Bits&Bytes Scheduler</span>
+					</div>
+
+					<h3 style="font-size: 0.75rem; font-weight: 700; color: var(--muted-foreground); text-transform: uppercase; margin-bottom: 0.5rem; letter-spacing: 0.05em;">Participants</h3>
+					<div id="attendee-list" class="meet-attendee-list">
+						<!-- Dynamically populated -->
+					</div>
+
+					<div style="margin-top: auto; padding-top: 1.5rem; display: flex; flex-direction: column; gap: 0.65rem;">
+						<div class="meet-detail-item">
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path><path d="M2 12h20"></path></svg>
+							<span id="meet-timezone" style="font-size: 0.8rem;">Asia/Kolkata</span>
+						</div>
+						<div class="meet-detail-item">
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+							<span style="font-size: 0.8rem;">Discord Voice Channel</span>
+						</div>
+						<div id="meet-scope-badge" class="meet-detail-item" style="display: none;">
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+							<span id="scope-label" style="font-size: 0.8rem;"></span>
+						</div>
+					</div>
+				</div>
+
+				<!-- Right Column: Details -->
+				<div class="meet-details-col">
+					<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; flex-wrap: wrap;">
+						<span id="meet-status" class="meet-status-badge status-scheduled">SCHEDULED</span>
+						<span id="reschedule-count-badge" class="reschedule-limit-badge" style="display: none;"></span>
+					</div>
+
+					<h1 id="meet-title" class="meet-title">Meeting Title</h1>
+					<p id="meet-description" class="meet-description"></p>
+
+					<div class="meet-detail-item">
+						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+						<strong id="meet-datetime">Loading...</strong>
+					</div>
+
+					<div class="meet-detail-item">
+						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+						<span id="meet-duration">30 minutes</span>
+					</div>
+
+					<div id="meet-location-row" class="meet-detail-item" style="display: none;">
+						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+						<span id="meet-location">Discord Temporary VC</span>
+					</div>
+
+					<!-- Action Buttons -->
+					<div class="meet-actions" id="meet-actions">
+						<a href="#" id="join-btn" class="meet-action-btn btn-join" style="display: none;" target="_blank">
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+							Join Now
+						</a>
+						<button type="button" id="reschedule-btn" class="meet-action-btn btn-reschedule" style="display: none;">
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+							Reschedule
+						</button>
+						<button type="button" id="copy-link-btn" class="meet-action-btn btn-copy-link">
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+							Copy Link
+						</button>
+					</div>
+
+					<!-- Reschedule Form (inline) -->
+					<div id="reschedule-form" class="meet-reschedule-form">
+						<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+							<h4 style="margin: 0;">Reschedule Meeting</h4>
+							<button type="button" id="reschedule-cancel-btn" style="background: none; border: none; color: var(--muted-foreground); cursor: pointer; font-size: 1.2rem; padding: 0.25rem;">✕</button>
+						</div>
+						<div id="reschedule-auth-gate" style="display: none; text-align: center; padding: 1rem 0;">
+							<p style="color: var(--muted-foreground); font-size: 0.875rem; margin-bottom: 1rem;">You must be logged in to reschedule.</p>
+							<a href="#" id="reschedule-login-btn" class="btn btn-primary" style="text-decoration: none;">Login with Discord</a>
+						</div>
+						<form id="reschedule-form-inner" style="display: none;">
+							<div class="form-group">
+								<label for="reschedule-date">New Date</label>
+								<input type="date" id="reschedule-date" class="form-control" required>
+							</div>
+							<div class="form-group">
+								<label for="reschedule-time">New Time</label>
+								<input type="time" id="reschedule-time" class="form-control" required>
+							</div>
+							<div class="form-group">
+								<label for="reschedule-reason">Reason for Rescheduling</label>
+								<textarea id="reschedule-reason" class="form-control" placeholder="e.g. Conflict with another meeting, personal emergency..." required></textarea>
+							</div>
+							<div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.25rem;">
+								<button type="button" id="reschedule-back-btn" class="btn btn-secondary" style="font-size: 0.85rem;">Cancel</button>
+								<button type="submit" id="reschedule-submit-btn" class="btn btn-primary" style="font-size: 0.85rem;">Confirm Reschedule</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			</div>
+
+			<!-- Reschedule History (below card) -->
+			<div id="history-section" class="meet-history-section" style="display: none;">
+				<button type="button" id="history-toggle" class="meet-history-toggle">
+					<span>📋 Reschedule History</span>
+					<span id="history-arrow">▼</span>
+				</button>
+				<div id="history-list" class="meet-history-list">
+					<!-- Dynamically populated -->
+				</div>
+			</div>
+		</div>
+	</main>
+
+	<footer>
+		<p>© 2026 Bits&Bytes Foundation. Powered by Discord Voice Infrastructure.</p>
+	</footer>
+
+	<script>
+		const meetCode = window.location.pathname.split('/m/')[1];
+		let meetingData = null;
+		let isAuthenticated = false;
+		let loggedInUser = null;
+		let liveParticipants = [];
+
+		async function loadMeeting() {
+			try {
+				const res = await fetch(`/api/meeting/${meetCode}`);
+				if (!res.ok) {
+					showError(res.status === 404 ? 'Meeting not found.' : 'Failed to load meeting.');
+					return;
+				}
+				meetingData = await res.json();
+				document.title = `${meetingData.title} // Bits&Bytes Scheduler`;
+				renderMeeting();
+				loadParticipants();
+			} catch (err) {
+				console.error(err);
+				showError('Connection error. Please try again.');
+			}
+		}
+
+		function showError(msg) {
+			document.getElementById('loading-state').style.display = 'none';
+			document.getElementById('error-message').textContent = msg;
+			document.getElementById('error-state').style.display = 'block';
+		}
+
+		function renderMeeting() {
+			document.getElementById('loading-state').style.display = 'none';
+			document.getElementById('meeting-view').style.display = 'block';
+
+			// Title & description
+			document.getElementById('meet-title').textContent = meetingData.title;
+			const descEl = document.getElementById('meet-description');
+			if (meetingData.description) {
+				descEl.textContent = meetingData.description;
+				descEl.style.display = 'block';
+			} else {
+				descEl.style.display = 'none';
+			}
+
+			// Status badge
+			const statusEl = document.getElementById('meet-status');
+			const statusLabels = { scheduled: 'SCHEDULED', active: 'LIVE', completed: 'COMPLETED', cancelled: 'CANCELLED', pending: 'PENDING' };
+			statusEl.textContent = statusLabels[meetingData.status] || meetingData.status.toUpperCase();
+			statusEl.className = `meet-status-badge status-${meetingData.status}`;
+
+			// Date/Time
+			const dt = new Date(meetingData.scheduled_time);
+			const dateStr = dt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'Asia/Kolkata' });
+			const timeStr = dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+			document.getElementById('meet-datetime').textContent = `${dateStr} at ${timeStr} IST`;
+
+			// Duration
+			if (meetingData.end_time) {
+				const durationMin = Math.round((meetingData.end_time - meetingData.scheduled_time) / 60000);
+				document.getElementById('meet-duration').textContent = `${durationMin} minutes`;
+			}
+
+			// Location
+			if (meetingData.location_type === 'discord_vc') {
+				document.getElementById('meet-location').textContent = 'Discord Temporary Voice Channel';
+				document.getElementById('meet-location-row').style.display = 'flex';
+			} else if (meetingData.location_details) {
+				document.getElementById('meet-location').textContent = meetingData.location_details;
+				document.getElementById('meet-location-row').style.display = 'flex';
+			}
+
+			// Scope
+			if (meetingData.scope && meetingData.scope !== 'invite') {
+				const scopeLabel = document.getElementById('scope-label');
+				if (meetingData.scope === 'open') {
+					scopeLabel.textContent = 'Open to all contributors';
+				} else if (meetingData.scope.startsWith('role:')) {
+					scopeLabel.textContent = 'Role-based access';
+				}
+				document.getElementById('meet-scope-badge').style.display = 'flex';
+			}
+
+			// Attendees
+			renderAttendees();
+
+			// Join button
+			const joinBtn = document.getElementById('join-btn');
+			if ((meetingData.status === 'active' || meetingData.status === 'scheduled') && meetingData.temp_channel_id && meetingData.guild_id) {
+				joinBtn.href = `https://discord.com/channels/${meetingData.guild_id}/${meetingData.temp_channel_id}`;
+				joinBtn.style.display = 'inline-flex';
+			}
+
+			// Reschedule button (only for creator or booker)
+			updateRescheduleUI();
+
+			// Reschedule history
+			if (meetingData.rescheduleHistory && meetingData.rescheduleHistory.length > 0) {
+				renderHistory();
+			}
+
+			// Reschedule count badge
+			if (meetingData.rescheduleCount !== undefined && meetingData.rescheduleCount > 0) {
+				const badge = document.getElementById('reschedule-count-badge');
+				badge.textContent = `${meetingData.rescheduleCount}/3 reschedules used`;
+				badge.style.display = 'inline-block';
+			}
+		}
+
+		function renderAttendees() {
+			const container = document.getElementById('attendee-list');
+			container.innerHTML = '';
+
+			if (!meetingData.attendeesResolved || meetingData.attendeesResolved.length === 0) {
+				container.innerHTML = '<p style="color: var(--muted-foreground); font-size: 0.8rem;">No participants listed.</p>';
+				return;
+			}
+
+			meetingData.attendeesResolved.forEach(att => {
+				const isCreator = att.discordId === meetingData.creator_id;
+				const isLive = liveParticipants.includes(att.discordId);
+				const initial = (att.displayName || att.username || '?')[0].toUpperCase();
+
+				const avatarContent = att.avatar
+					? `<img src="https://cdn.discordapp.com/avatars/${att.discordId}/${att.avatar}.png?size=64" alt="${att.displayName || att.username}">`
+					: initial;
+
+				const item = document.createElement('div');
+				item.className = 'meet-attendee-item';
+				item.innerHTML = `
+					<div class="meet-attendee-avatar">
+						${typeof avatarContent === 'string' && avatarContent.startsWith('<') ? avatarContent : `<span>${avatarContent}</span>`}
+						${isLive ? '<div class="meet-live-dot"></div>' : ''}
+					</div>
+					<div style="flex: 1; min-width: 0;">
+						<div class="meet-attendee-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${att.displayName || att.username || 'Unknown'}</div>
+						<div class="meet-attendee-role">${isCreator ? 'Host' : (att.type === 'role' ? 'Role Invite' : 'Participant')}</div>
+					</div>
+				`;
+				container.appendChild(item);
+			});
+		}
+
+		function updateRescheduleUI() {
+			const rescheduleBtn = document.getElementById('reschedule-btn');
+			const canReschedule = loggedInUser && (
+				loggedInUser.id === meetingData.creator_id ||
+				loggedInUser.id === meetingData.booked_by
+			);
+			const meetingIsReschedulable = ['scheduled', 'pending'].includes(meetingData.status);
+			const limitReached = meetingData.rescheduleCount >= 3;
+
+			if (meetingIsReschedulable && !limitReached) {
+				rescheduleBtn.style.display = 'inline-flex';
+				if (!canReschedule && !isAuthenticated) {
+					// Show login gate when clicked
+					rescheduleBtn.addEventListener('click', () => {
+						document.getElementById('reschedule-form').classList.add('active');
+						document.getElementById('reschedule-auth-gate').style.display = 'block';
+						document.getElementById('reschedule-form-inner').style.display = 'none';
+						document.getElementById('reschedule-login-btn').href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+					});
+				} else if (canReschedule) {
+					rescheduleBtn.addEventListener('click', () => {
+						document.getElementById('reschedule-form').classList.add('active');
+						document.getElementById('reschedule-auth-gate').style.display = 'none';
+						document.getElementById('reschedule-form-inner').style.display = 'block';
+					});
+				} else {
+					rescheduleBtn.style.display = 'none';
+				}
+			}
+		}
+
+		function renderHistory() {
+			const section = document.getElementById('history-section');
+			const list = document.getElementById('history-list');
+			section.style.display = 'block';
+			list.innerHTML = '';
+
+			meetingData.rescheduleHistory.forEach(entry => {
+				const oldDt = new Date(entry.old_scheduled_time);
+				const newDt = new Date(entry.new_scheduled_time);
+				const at = new Date(entry.rescheduled_at);
+				const fmt = (d) => d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+
+				const item = document.createElement('div');
+				item.className = 'meet-history-item';
+				item.innerHTML = `
+					<div class="history-meta">
+						<span>🔄</span>
+						<span>Rescheduled by ${entry.rescheduled_by_name || entry.rescheduled_by} · ${at.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata' })}</span>
+					</div>
+					<div class="history-times">
+						<span class="history-old-time">${fmt(oldDt)}</span>
+						<span class="history-arrow">→</span>
+						<span class="history-new-time">${fmt(newDt)}</span>
+					</div>
+					${entry.reason ? `<div class="history-reason">"${entry.reason}"</div>` : ''}
+				`;
+				list.appendChild(item);
+			});
+		}
+
+		async function loadParticipants() {
+			if (meetingData.status !== 'active') return;
+			try {
+				const res = await fetch(`/api/meeting/${meetCode}/participants`);
+				if (res.ok) {
+					const data = await res.json();
+					liveParticipants = data.map(p => p.id);
+					renderAttendees();
+				}
+			} catch (err) {
+				console.warn('Could not load live participants:', err);
+			}
+		}
+
+		async function checkUserSession() {
+			try {
+				const res = await fetch('/api/user/me');
+				if (res.ok) {
+					const userData = await res.json();
+					if (userData && !userData.error) {
+						isAuthenticated = true;
+						loggedInUser = userData;
+					}
+				}
+			} catch (err) {
+				console.log('Session check failed:', err);
+			}
+		}
+
+		// Copy link handler
+		document.getElementById('copy-link-btn').addEventListener('click', async () => {
+			const url = `${window.location.origin}/m/${meetCode}`;
+			try {
+				await navigator.clipboard.writeText(url);
+				const btn = document.getElementById('copy-link-btn');
+				const originalHTML = btn.innerHTML;
+				btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied!';
+				btn.style.color = 'var(--success)';
+				btn.style.borderColor = 'var(--success)';
+				setTimeout(() => {
+					btn.innerHTML = originalHTML;
+					btn.style.color = '';
+					btn.style.borderColor = '';
+				}, 2000);
+			} catch (err) {
+				// Fallback
+				const input = document.createElement('input');
+				input.value = url;
+				document.body.appendChild(input);
+				input.select();
+				document.execCommand('copy');
+				document.body.removeChild(input);
+			}
+		});
+
+		// Reschedule form handlers
+		document.getElementById('reschedule-cancel-btn').addEventListener('click', () => {
+			document.getElementById('reschedule-form').classList.remove('active');
+		});
+		document.getElementById('reschedule-back-btn')?.addEventListener('click', () => {
+			document.getElementById('reschedule-form').classList.remove('active');
+		});
+
+		// History toggle
+		document.getElementById('history-toggle').addEventListener('click', () => {
+			const list = document.getElementById('history-list');
+			const arrow = document.getElementById('history-arrow');
+			list.classList.toggle('active');
+			arrow.textContent = list.classList.contains('active') ? '▲' : '▼';
+		});
+
+		// Reschedule form submission
+		document.getElementById('reschedule-form-inner').addEventListener('submit', async (e) => {
+			e.preventDefault();
+			const date = document.getElementById('reschedule-date').value;
+			const time = document.getElementById('reschedule-time').value;
+			const reason = document.getElementById('reschedule-reason').value.trim();
+
+			if (!date || !time || !reason) {
+				alert('Please fill in all fields.');
+				return;
+			}
+
+			const submitBtn = document.getElementById('reschedule-submit-btn');
+			submitBtn.disabled = true;
+			submitBtn.textContent = 'Rescheduling...';
+
+			try {
+				const res = await fetch(`/api/meeting/${meetCode}/reschedule`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ date, time, reason })
+				});
+
+				if (res.ok) {
+					const result = await res.json();
+					meetingData = result.meeting;
+					document.getElementById('reschedule-form').classList.remove('active');
+					renderMeeting();
+					// Show success feedback
+					const btn = document.getElementById('reschedule-btn');
+					btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> Rescheduled!';
+					btn.style.borderColor = 'var(--success)';
+					btn.style.color = 'var(--success)';
+					setTimeout(() => location.reload(), 1500);
+				} else {
+					const err = await res.json();
+					alert(err.error || 'Failed to reschedule.');
+				}
+			} catch (err) {
+				console.error(err);
+				alert('Connection error. Please try again.');
+			} finally {
+				submitBtn.disabled = false;
+				submitBtn.textContent = 'Confirm Reschedule';
+			}
+		});
+
+		// Auto-refresh live participants every 15s if meeting is active
+		function startLivePolling() {
+			if (meetingData && meetingData.status === 'active') {
+				setInterval(loadParticipants, 15000);
+			}
+		}
+
+		// Initialize
+		(async () => {
+			await checkUserSession();
+			await loadMeeting();
+			startLivePolling();
+		})();
+	</script>
+</body>
+</html>

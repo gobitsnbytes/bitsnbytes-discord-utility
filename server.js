@@ -8,6 +8,7 @@ const { EmbedBuilder } = require('discord.js');
 const db = require('./lib/db');
 const meetingsDb = require('./lib/meetingsDb');
 const meetingsHelper = require('./lib/meetingsHelper');
+const pushNotifier = require('./lib/pushNotifier');
 const { getEventsChannel } = require('./lib/calcomWebhook');
 const config = require('./config');
 const logger = require('./lib/logger');
@@ -223,14 +224,15 @@ function startWebServer(client) {
                 id: userData.id,
                 username: userData.username,
                 email: userData.email || null,
+                avatar: userData.avatar || null
             };
             sessions.set(sessionId, userDetails);
 
             const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
             await db.run(
-                `INSERT INTO web_sessions (id, user_id, username, email, expires_at)
-                 VALUES (?, ?, ?, ?, ?)`,
-                [sessionId, userData.id, userData.username, userData.email || null, expiresAt]
+                `INSERT INTO web_sessions (id, user_id, username, email, avatar, expires_at)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [sessionId, userData.id, userData.username, userData.email || null, userData.avatar || null, expiresAt]
             ).catch(err => {
                 console.error('[AUTH_CALLBACK] Failed to save session to DB:', err.message);
             });
@@ -252,17 +254,17 @@ function startWebServer(client) {
                 const existingUser = await db.get(`SELECT 1 FROM user_availability WHERE discord_id = ?`, [userData.id]);
                 if (!existingUser) {
                     await db.run(
-                        `INSERT INTO user_availability (discord_id, username, email, timezone, weekly_hours, booking_link, title, description, associated_role_id)
-                         VALUES (?, ?, ?, 'Asia/Kolkata', '{"monday":[],"tuesday":[],"wednesday":[],"thursday":[],"friday":[],"saturday":[],"sunday":[]}', ?, ?, '', ?)`,
-                        [userData.id, userData.username, userData.email || null, `link_${userData.username.toLowerCase().substring(0, 10)}`, defaultTitle, cityRoleId || null]
+                        `INSERT INTO user_availability (discord_id, username, email, timezone, weekly_hours, booking_link, title, description, associated_role_id, avatar)
+                         VALUES (?, ?, ?, 'Asia/Kolkata', '{"monday":[],"tuesday":[],"wednesday":[],"thursday":[],"friday":[],"saturday":[],"sunday":[]}', ?, ?, '', ?, ?)`,
+                        [userData.id, userData.username, userData.email || null, `link_${userData.username.toLowerCase().substring(0, 10)}`, defaultTitle, cityRoleId || null, userData.avatar || null]
                     );
                 } else {
                     // Update email and associated_role_id if it changed
                     await db.run(
                         `UPDATE user_availability 
-                         SET email = ?, associated_role_id = ? 
+                         SET email = ?, associated_role_id = ?, avatar = ? 
                          WHERE discord_id = ?`,
-                        [userData.email || null, cityRoleId || null, userData.id]
+                        [userData.email || null, cityRoleId || null, userData.avatar || null, userData.id]
                     );
                 }
             }
@@ -342,27 +344,35 @@ function startWebServer(client) {
     // API ENDPOINTS
     // ============================================
 
-    // Fetch logged in user profile
     app.get('/api/user/me', checkAuth, async (req, res) => {
         try {
             let user = await db.get(`SELECT * FROM user_availability WHERE discord_id = ?`, [req.user.id]);
+            let isContributor = false;
+
+            // Check contributor role
+            const guildId = process.env.GUILD_ID;
+            const guild = guildId ? client.guilds.cache.get(guildId) : client.guilds.cache.first();
+            if (guild) {
+                const member = await guild.members.fetch(req.user.id).catch(() => null);
+                isContributor = member ? member.roles.cache.some(r => r.name.toLowerCase() === 'contributor') : false;
+            }
+
             if (user) {
-                if (user.associated_role_id) {
-                    const guildId = process.env.GUILD_ID;
-                    const guild = client.guilds.cache.get(guildId);
-                    if (guild) {
-                        const role = guild.roles.cache.get(user.associated_role_id);
-                        if (role) {
-                            user.associated_role_name = role.name;
-                        }
+                if (user.associated_role_id && guild) {
+                    const role = guild.roles.cache.get(user.associated_role_id);
+                    if (role) {
+                        user.associated_role_name = role.name;
                     }
                 }
+                user.isContributor = isContributor;
             } else {
                 user = {
                     discord_id: req.user.id,
                     username: req.user.username,
                     email: req.user.email,
-                    isGuest: true
+                    avatar: req.user.avatar || null,
+                    isGuest: true,
+                    isContributor
                 };
             }
             res.json(user);
@@ -425,10 +435,9 @@ function startWebServer(client) {
         }
     });
 
-    // List all active booking profiles
     app.get('/api/users', async (req, res) => {
         try {
-            const users = await db.all(`SELECT username, title, booking_link, description, timezone, weekly_hours, calcom_event_type_id, associated_role_id FROM user_availability WHERE booking_link IS NOT NULL`);
+            const users = await db.all(`SELECT discord_id, username, title, booking_link, description, timezone, weekly_hours, calcom_event_type_id, associated_role_id, avatar FROM user_availability WHERE booking_link IS NOT NULL`);
             res.json(users);
         } catch (err) {
             res.status(500).json({ error: 'Database query failed' });
@@ -580,6 +589,333 @@ function startWebServer(client) {
         }
     });
 
+    // ============================================
+    // MEETING PAGE ROUTES
+    // ============================================
+
+    // Serve meeting page HTML
+    app.get('/m/:meetCode', async (req, res) => {
+        const { meetCode } = req.params;
+        if (!/^[a-z]{3}-[a-z]{4}-[a-z]{3}$/.test(meetCode)) {
+            return res.status(404).sendFile(path.join(__dirname, 'public/index.html'));
+        }
+        const meeting = await meetingsDb.getMeetingByCode(meetCode).catch(() => null);
+        if (!meeting) {
+            return res.status(404).sendFile(path.join(__dirname, 'public/meet.html'));
+        }
+        res.sendFile(path.join(__dirname, 'public/meet.html'));
+    });
+
+    // API: Get meeting details by code
+    app.get('/api/meeting/:meetCode', async (req, res) => {
+        try {
+            const { meetCode } = req.params;
+            const meeting = await meetingsDb.getMeetingByCode(meetCode);
+            if (!meeting) {
+                return res.status(404).json({ error: 'Meeting not found.' });
+            }
+
+            // Resolve attendee details (username, avatar, display name)
+            const guild = client.guilds.cache.first();
+            const attendeesResolved = [];
+
+            for (const att of (meeting.attendees || [])) {
+                try {
+                    if (att.type === 'user') {
+                        const member = guild ? await guild.members.fetch(att.discordId).catch(() => null) : null;
+                        const userAvail = await db.get('SELECT title, avatar FROM user_availability WHERE discord_id = ?', [att.discordId]);
+                        attendeesResolved.push({
+                            discordId: att.discordId,
+                            type: att.type,
+                            username: member ? member.user.username : 'Unknown',
+                            displayName: userAvail?.title || (member ? member.displayName : 'Unknown'),
+                            avatar: userAvail?.avatar || (member ? member.user.avatar : null)
+                        });
+                    } else if (att.type === 'role') {
+                        attendeesResolved.push({
+                            discordId: att.discordId,
+                            type: 'role',
+                            username: 'Role Invite',
+                            displayName: guild ? (guild.roles.cache.get(att.discordId)?.name || 'Role') : 'Role',
+                            avatar: null
+                        });
+                    }
+                } catch (e) {
+                    attendeesResolved.push({ discordId: att.discordId, type: att.type, username: 'Unknown', displayName: 'Unknown', avatar: null });
+                }
+            }
+
+            // Get reschedule history and count
+            const rescheduleHistory = await meetingsDb.getRescheduleHistory(meeting.id);
+            const rescheduleCount = await meetingsDb.getRescheduleCount(meeting.id);
+
+            // Resolve rescheduled_by names in history
+            for (const entry of rescheduleHistory) {
+                try {
+                    const member = guild ? await guild.members.fetch(entry.rescheduled_by).catch(() => null) : null;
+                    entry.rescheduled_by_name = member ? member.displayName : entry.rescheduled_by;
+                } catch (e) {
+                    entry.rescheduled_by_name = entry.rescheduled_by;
+                }
+            }
+
+            res.json({
+                ...meeting,
+                attendeesResolved,
+                rescheduleHistory,
+                rescheduleCount,
+                guild_id: guild ? guild.id : null
+            });
+        } catch (err) {
+            console.error('[API_MEETING_ERROR]', err);
+            res.status(500).json({ error: 'Failed to fetch meeting details.' });
+        }
+    });
+
+    // API: Reschedule a meeting
+    app.post('/api/meeting/:meetCode/reschedule', checkAuth, async (req, res) => {
+        try {
+            const { meetCode } = req.params;
+            const { date, time, reason } = req.body;
+
+            if (!date || !time || !reason) {
+                return res.status(400).json({ error: 'Date, time, and reason are required.' });
+            }
+
+            const meeting = await meetingsDb.getMeetingByCode(meetCode);
+            if (!meeting) {
+                return res.status(404).json({ error: 'Meeting not found.' });
+            }
+
+            // Permission check: creator or booker
+            const canReschedule = (req.user.id === meeting.creator_id) || (req.user.id === meeting.booked_by);
+            if (!canReschedule) {
+                return res.status(403).json({ error: 'You are not authorized to reschedule this meeting.' });
+            }
+
+            if (!['scheduled', 'pending'].includes(meeting.status)) {
+                return res.status(400).json({ error: 'Only scheduled or pending meetings can be rescheduled.' });
+            }
+
+            // Calculate new times
+            const primaryHost = await db.get('SELECT timezone FROM user_availability WHERE discord_id = ?', [meeting.creator_id]);
+            const tz = primaryHost?.timezone || 'Asia/Kolkata';
+            const offset = OFFSETS[tz] || '+05:30';
+            const newStartISO = `${date}T${time}:00${offset}`;
+            const newStartMs = Date.parse(newStartISO);
+            const duration = meeting.end_time ? (meeting.end_time - meeting.scheduled_time) : 30 * 60 * 1000;
+            const newEndMs = newStartMs + duration;
+
+            if (newStartMs <= Date.now()) {
+                return res.status(400).json({ error: 'Cannot reschedule to a time in the past.' });
+            }
+
+            const oldStartMs = meeting.scheduled_time;
+
+            // Perform the reschedule
+            const updatedMeeting = await meetingsDb.rescheduleMeeting(meeting.id, newStartMs, newEndMs, reason, req.user.id);
+
+            // Notify all attendees
+            const guild = client.guilds.cache.first();
+            if (guild) {
+                const rescheduledByMember = await guild.members.fetch(req.user.id).catch(() => null);
+                const rescheduledByName = rescheduledByMember ? rescheduledByMember.displayName : req.user.username;
+
+                const oldTimeFormatted = new Date(oldStartMs).toLocaleString('en-US', { timeZone: 'Asia/Kolkata', hour12: true, hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'short', year: 'numeric' }) + ' IST';
+                const newTimeFormatted = new Date(newStartMs).toLocaleString('en-US', { timeZone: 'Asia/Kolkata', hour12: true, hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'short', year: 'numeric' }) + ' IST';
+
+                // Send DMs
+                meetingsHelper.sendRescheduleDMs(guild, updatedMeeting, oldStartMs, newStartMs, reason, rescheduledByName).catch(e => console.error('[RESCHEDULE_DM_ERROR]', e));
+
+                // Push notifications
+                pushNotifier.notifyReschedule(updatedMeeting, rescheduledByName).catch(e => console.error('[RESCHEDULE_PUSH_ERROR]', e));
+
+                // Send emails
+                meetingsHelper.sendMeetingEmails(guild, updatedMeeting, 'reschedule', '30 minutes', {
+                    oldTime: oldTimeFormatted,
+                    newTime: newTimeFormatted,
+                    reason,
+                    rescheduledByName
+                }).catch(e => console.error('[RESCHEDULE_EMAIL_ERROR]', e));
+            }
+
+            // Refetch for full response
+            const fullMeeting = await meetingsDb.getMeetingByCode(meetCode);
+            const rescheduleHistory = await meetingsDb.getRescheduleHistory(meeting.id);
+            const rescheduleCount = await meetingsDb.getRescheduleCount(meeting.id);
+
+            res.json({ success: true, meeting: { ...fullMeeting, rescheduleHistory, rescheduleCount, guild_id: guild ? guild.id : null } });
+        } catch (err) {
+            console.error('[RESCHEDULE_ERROR]', err);
+            if (err.message && err.message.includes('Reschedule limit')) {
+                return res.status(400).json({ error: err.message });
+            }
+            res.status(500).json({ error: 'Failed to reschedule meeting.' });
+        }
+    });
+
+    // API: Get live VC participants for a meeting
+    app.get('/api/meeting/:meetCode/participants', async (req, res) => {
+        try {
+            const meeting = await meetingsDb.getMeetingByCode(req.params.meetCode);
+            if (!meeting || !meeting.temp_channel_id) {
+                return res.json([]);
+            }
+
+            const guild = client.guilds.cache.first();
+            if (!guild) return res.json([]);
+
+            const channel = guild.channels.cache.get(meeting.temp_channel_id);
+            if (!channel || !channel.members) return res.json([]);
+
+            const participants = channel.members
+                .filter(m => !m.user.bot)
+                .map(m => ({ id: m.id, username: m.user.username, displayName: m.displayName, avatar: m.user.avatar }));
+
+            res.json(participants);
+        } catch (err) {
+            console.error('[PARTICIPANTS_ERROR]', err);
+            res.json([]);
+        }
+    });
+
+    // API: Create instant meeting (contributors only)
+    app.post('/api/instant-meeting', checkAuth, async (req, res) => {
+        try {
+            const { title, description, scope } = req.body;
+            if (!title) {
+                return res.status(400).json({ error: 'Meeting title is required.' });
+            }
+
+            // Verify contributor role
+            const guild = client.guilds.cache.first();
+            if (!guild) return res.status(500).json({ error: 'Guild not found.' });
+
+            const member = await guild.members.fetch(req.user.id).catch(() => null);
+            if (!member || !member.roles.cache.some(r => r.name.toLowerCase() === 'contributor')) {
+                return res.status(403).json({ error: 'Only contributors can create instant meetings.' });
+            }
+
+            const id = `meet_instant_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            const now = Date.now();
+
+            const result = await meetingsDb.createMeeting({
+                id,
+                title: title,
+                description: description || `Instant meeting started by ${req.user.username}.`,
+                scheduledTime: now,
+                locationType: 'discord_vc',
+                locationDetails: '',
+                creatorId: req.user.id,
+                bookedBy: req.user.id,
+                status: 'active',
+                endTime: now + 60 * 60 * 1000, // Default 1 hour
+                scope: scope || 'open'
+            });
+
+            await meetingsDb.addAttendee(id, 'user', req.user.id);
+
+            // Create VC immediately
+            const createdMeeting = await meetingsDb.getMeeting(id);
+            if (createdMeeting) {
+                const vcChannel = await meetingsHelper.createMeetingVoiceChannel(guild, createdMeeting);
+                if (vcChannel) {
+                    createdMeeting.temp_channel_id = vcChannel.id;
+                }
+
+                // Announce in events channel
+                const eventsChannel = await getEventsChannel(guild);
+                if (eventsChannel) {
+                    const embed = new EmbedBuilder()
+                        .setTitle(`⚡ INSTANT_MEETING // ACTIVE`)
+                        .setDescription(`**${member.displayName}** started an instant meeting.`)
+                        .addFields(
+                            { name: '📋 TITLE', value: title, inline: false },
+                            { name: '🔗 MEETING LINK', value: `https://cal.gobitsnbytes.org/m/${result.meetCode}`, inline: false }
+                        )
+                        .setColor('#10b981')
+                        .setTimestamp()
+                        .setFooter({ text: config.BRANDING.footerText });
+
+                    if (vcChannel) {
+                        embed.addFields({ name: '🔊 VOICE CHANNEL', value: `[Join VC](https://discord.com/channels/${guild.id}/${vcChannel.id})`, inline: true });
+                    }
+
+                    await eventsChannel.send({
+                        content: `⚡ **Instant Meeting Started**: <@${req.user.id}>`,
+                        embeds: [embed]
+                    });
+                }
+            }
+
+            res.json({
+                success: true,
+                meetCode: result.meetCode,
+                meetUrl: `https://cal.gobitsnbytes.org/m/${result.meetCode}`,
+                vcChannelId: createdMeeting?.temp_channel_id || null,
+                guildId: guild.id
+            });
+        } catch (err) {
+            console.error('[INSTANT_MEETING_ERROR]', err);
+            res.status(500).json({ error: 'Failed to create instant meeting.' });
+        }
+    });
+
+    // API: Get current user's meetings
+    app.get('/api/my-meetings', checkAuth, async (req, res) => {
+        try {
+            const meetings = await meetingsDb.getActiveMeetingsByCreator(req.user.id);
+            res.json(meetings);
+        } catch (err) {
+            console.error('[MY_MEETINGS_ERROR]', err);
+            res.status(500).json({ error: 'Failed to fetch meetings.' });
+        }
+    });
+
+    // ============================================
+    // PUSH NOTIFICATION ENDPOINTS
+    // ============================================
+
+    // Return VAPID public key so the client can subscribe
+    app.get('/api/push/vapid-key', (req, res) => {
+        if (!process.env.VAPID_PUBLIC_KEY) {
+            return res.status(404).json({ error: 'Push notifications not configured.' });
+        }
+        res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
+    });
+
+    // Save push subscription
+    app.post('/api/push/subscribe', checkAuth, async (req, res) => {
+        try {
+            const { subscription } = req.body;
+            if (!subscription || !subscription.endpoint || !subscription.keys) {
+                return res.status(400).json({ error: 'Invalid subscription.' });
+            }
+            await meetingsDb.savePushSubscription(req.user.id, subscription);
+            res.json({ success: true });
+        } catch (err) {
+            console.error('[PUSH_SUBSCRIBE_ERROR]', err);
+            res.status(500).json({ error: 'Failed to save subscription.' });
+        }
+    });
+
+    // Remove push subscription
+    app.post('/api/push/unsubscribe', checkAuth, async (req, res) => {
+        try {
+            const { endpoint } = req.body;
+            if (!endpoint) return res.status(400).json({ error: 'Missing endpoint.' });
+            await meetingsDb.removePushSubscription(endpoint);
+            res.json({ success: true });
+        } catch (err) {
+            console.error('[PUSH_UNSUBSCRIBE_ERROR]', err);
+            res.status(500).json({ error: 'Failed to remove subscription.' });
+        }
+    });
+
+    // ============================================
+    // BOOKING PAGE (dynamic host handle routes)
+    // ============================================
+
     // Book a meeting slot
     app.get('/:bookingLink', async (req, res, next) => {
         const { bookingLink } = req.params;
@@ -721,6 +1057,7 @@ function startWebServer(client) {
                 locationType: 'discord_vc',
                 locationDetails: '',
                 creatorId: primaryHost.discord_id,
+                bookedBy: req.user.id,
                 status: instant ? 'pending' : 'scheduled',
                 endTime: endTimeMs,
                 externalEmails: [email.trim().toLowerCase()],

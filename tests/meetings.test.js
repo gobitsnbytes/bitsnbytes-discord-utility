@@ -30,6 +30,17 @@ describe('Meeting Scheduler Database Tests', () => {
 	const testMeetingId = 'meet_test_123';
 
 	beforeAll(async () => {
+		// Wait for meetingsDb migrations to complete (db.serialize is async)
+		const libDb = require('../lib/db');
+		for (let i = 0; i < 20; i++) {
+			try {
+				await libDb.get("SELECT meet_code FROM meetings LIMIT 0");
+				break;
+			} catch (e) {
+				await new Promise(resolve => setTimeout(resolve, 100));
+			}
+		}
+
 		await new Promise((resolve) => {
 			db.serialize(() => {
 				db.run("DELETE FROM meetings", () => {

@@ -35,7 +35,8 @@
     "nodemailer": "^8.0.7",
     "prism-media": "2.0.0-alpha.0",
     "sodium-native": "^4.3.1",
-    "sqlite3": "^6.0.1"
+    "sqlite3": "^6.0.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "jest": "^30.3.0"

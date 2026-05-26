@@ -29,6 +29,37 @@
             <p class="subtitle">Select a member of the Bits&Bytes core team below to book a sync. Meetings are hosted on our official Discord conferencing infrastructure with automated temporary voice channels and calendar invitations.</p>
         </div>
 
+        <!-- Instant Meeting Launcher (contributors only) -->
+        <div class="instant-meet-launcher" id="instant-meet-launcher">
+            <div class="instant-meet-launcher-header">
+                <div class="lightning-icon">⚡</div>
+                <h3>Start Instant Meeting</h3>
+            </div>
+            <p class="launcher-desc">Launch a live voice session right now. A unique meeting link will be generated and a Discord VC will be provisioned instantly.</p>
+            <div class="instant-meet-form" id="instant-meet-form">
+                <div class="form-group">
+                    <label for="instant-title">Meeting Title</label>
+                    <input type="text" id="instant-title" class="form-control" placeholder="e.g. Quick Sync, Sprint Review..." required>
+                </div>
+                <div class="form-group" style="max-width: 200px;">
+                    <label for="instant-scope">Access Scope</label>
+                    <select id="instant-scope" class="form-control">
+                        <option value="open">Open (All Contributors)</option>
+                        <option value="invite">Invite Only</option>
+                    </select>
+                </div>
+                <button type="button" class="btn-start-instant" id="btn-start-instant">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    Start Now
+                </button>
+            </div>
+            <div class="instant-meet-result" id="instant-meet-result">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span class="meet-link" id="instant-meet-link"></span>
+                <button type="button" class="btn btn-secondary" id="copy-instant-link" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; white-space: nowrap;">Copy Link</button>
+            </div>
+        </div>
+
         <div class="users-grid" id="hosts-grid">
             <!-- Dynamically populated -->
             <div class="empty-state" id="loading-indicator" style="grid-column: 1 / -1; border-style: solid;">
@@ -97,6 +128,9 @@
                 
                 users.forEach(user => {
                     const avatarLetter = user.title ? user.title.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase();
+                    const avatarContent = user.avatar
+                        ? `<img src="https://cdn.discordapp.com/avatars/${user.discord_id}/${user.avatar}.png?size=128" alt="${user.title || user.username}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`
+                        : avatarLetter;
                     const card = document.createElement('div');
                     card.className = 'user-card';
                     card.innerHTML = `
@@ -105,7 +139,7 @@
                         </div>
                         <div>
                             <div class="user-card-header">
-                                <div class="user-avatar">${avatarLetter}</div>
+                                <div class="user-avatar">${avatarContent}</div>
                                 <div class="user-meta">
                                     <h3>${user.title || user.username}</h3>
                                     <span>@${user.booking_link}</span>
@@ -162,14 +196,122 @@
                             <span>Logout</span>
                         </a>
                     `;
+
+                    // Show instant meeting launcher for contributors
+                    if (user.isContributor) {
+                        document.getElementById('instant-meet-launcher').classList.add('visible');
+                    }
                 }
             } catch (err) {
                 console.warn('OAuth check failed:', err);
             }
         }
 
+        // Instant meeting launcher
+        document.getElementById('btn-start-instant').addEventListener('click', async () => {
+            const title = document.getElementById('instant-title').value.trim();
+            const scope = document.getElementById('instant-scope').value;
+            if (!title) {
+                document.getElementById('instant-title').focus();
+                return;
+            }
+            const btn = document.getElementById('btn-start-instant');
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+            try {
+                const res = await fetch('/api/instant-meeting', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, scope })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('instant-meet-link').textContent = data.meetUrl;
+                    document.getElementById('instant-meet-result').classList.add('visible');
+                    document.getElementById('instant-title').value = '';
+                } else {
+                    alert(data.error || 'Failed to create meeting.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Connection error.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Start Now';
+            }
+        });
+
+        document.getElementById('copy-instant-link').addEventListener('click', async () => {
+            const link = document.getElementById('instant-meet-link').textContent;
+            try {
+                await navigator.clipboard.writeText(link);
+                const btn = document.getElementById('copy-instant-link');
+                btn.textContent = 'Copied!';
+                setTimeout(() => { btn.textContent = 'Copy Link'; }, 2000);
+            } catch (e) {
+                const input = document.createElement('input');
+                input.value = link;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+            }
+        });
+
+        // Service Worker & Push Notifications
+        async function initPushNotifications() {
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+            try {
+                const reg = await navigator.serviceWorker.register('/sw.js');
+                
+                // Only subscribe if logged in
+                const meRes = await fetch('/api/user/me');
+                if (!meRes.ok) return;
+
+                // Get VAPID key
+                const keyRes = await fetch('/api/push/vapid-key');
+                if (!keyRes.ok) return;
+                const { publicKey } = await keyRes.json();
+
+                // Check existing subscription
+                let subscription = await reg.pushManager.getSubscription();
+                if (!subscription) {
+                    // Request permission
+                    const permission = await Notification.requestPermission();
+                    if (permission !== 'granted') return;
+
+                    subscription = await reg.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(publicKey)
+                    });
+                }
+
+                // Send to server
+                await fetch('/api/push/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subscription })
+                });
+            } catch (err) {
+                console.warn('Push notification setup failed:', err);
+            }
+        }
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
         checkLogin();
         loadHosts();
+        initPushNotifications();
     </script>
 </body>
 </html>

@@ -89,7 +89,8 @@ module.exports = {
 		'meet-email': true,        // Ephemeral - email registration
 		'meet-schedule': true,     // Ephemeral - meeting scheduler
 		'meet-transcript': true,   // Ephemeral - transcript retrieval
-		'meet-start': true         // Ephemeral - start meeting manually
+		'meet-start': true,        // Ephemeral - start meeting manually
+		'meet-reschedule': true    // Ephemeral - reschedule meeting
 	},
 
 	// 🎙️ MEETING RECORDING & TRANSCRIPTION
