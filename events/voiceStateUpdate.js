@@ -65,7 +65,22 @@ module.exports = {
 				try {
 					const meeting = await meetingsDb.findMeetingByTempChannel(oldChannelId);
 
-					if (meeting && (meeting.status === 'active' || meeting.status === 'scheduled')) {
+					if (meeting) {
+						// Only end the meeting if it has actually commenced (status is active)
+						// AND we are past a 5-minute grace period from the scheduled start time.
+						// Otherwise, keep the VC open for attendees to join/rejoin.
+						if (meeting.status === 'active') {
+							const timeSinceStart = Date.now() - meeting.scheduled_time;
+							if (timeSinceStart < 5 * 60 * 1000) {
+								console.log(`[MEETING] Temporary VC ${oldChannel.name} (${oldChannelId}) is empty, but within 5-minute grace period. Keeping VC open.`);
+								return;
+							}
+						} else {
+							// If the meeting is still scheduled/pending, do not delete the channel when empty
+							console.log(`[MEETING] Temporary VC ${oldChannel.name} (${oldChannelId}) is empty, but meeting is still scheduled/pending. Keeping VC open.`);
+							return;
+						}
+
 						console.log(`[MEETING] Temporary VC ${oldChannel.name} (${oldChannelId}) is now empty.`);
 
 						// Stop recording and queue transcription BEFORE deleting the channel

@@ -105,7 +105,7 @@ module.exports = (client) => {
 
 					// Stale cleanup: if VC has been empty for > 30 minutes after start time
 					const durationActive = now - meeting.scheduled_time;
-					if (durationActive > 30 * 60 * 1000 && vcChannel.members.size === 0) {
+					if (durationActive > 30 * 60 * 1000 && vcChannel.members.filter(m => !m.user.bot).size === 0) {
 						console.log(`[MEETING] VC empty for over 30 mins. Cleaning up meeting "${meeting.title}"...`);
 						await vcChannel.delete('Stale meeting VC deleted.').catch(() => {});
 						await meetingsDb.updateMeetingStatus(meeting.id, 'completed');
