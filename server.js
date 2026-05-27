@@ -1143,7 +1143,7 @@ function startWebServer(client) {
 
     app.post('/api/book/:bookingLink', checkAuth, async (req, res) => {
         const { bookingLink } = req.params;
-        const { date, slot, name, email, guests, title, description, notes, duration, additionalHosts, inviteWholeFork, instant } = req.body;
+        const { date, slot, name, email, guests, title, description, notes, duration, additionalHosts, inviteWholeFork, instant, scope } = req.body;
 
         if (instant) {
             if (!name || !email || !title) {
@@ -1249,7 +1249,8 @@ function startWebServer(client) {
                 endTime: endTimeMs,
                 externalEmails,
                 calcomBookingId: null,
-                calcomUid: null
+                calcomUid: null,
+                scope: scope || 'invite'
             };
 
             // Write the hold lock meeting record to database immediately to block concurrent bookings!

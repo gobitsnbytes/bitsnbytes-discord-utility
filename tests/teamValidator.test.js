@@ -14,19 +14,21 @@ const {
 } = require('../lib/teamValidator');
 
 describe('Constants', () => {
-	test('REQUIRED_ROLES should contain Tech Lead, Creative Lead, Ops Lead', () => {
+	test('REQUIRED_ROLES should contain Tech Lead, Creative Lead, Ops Lead, Outreach Lead', () => {
 		expect(REQUIRED_ROLES).toContain('Tech Lead');
 		expect(REQUIRED_ROLES).toContain('Creative Lead');
 		expect(REQUIRED_ROLES).toContain('Ops Lead');
-		expect(REQUIRED_ROLES.length).toBe(3);
+		expect(REQUIRED_ROLES).toContain('Outreach Lead');
+		expect(REQUIRED_ROLES.length).toBe(4);
 	});
 
-	test('VALID_ROLES should contain all required roles plus Volunteer and Member', () => {
+	test('VALID_ROLES should contain all required roles plus Contributor and Volunteer', () => {
 		expect(VALID_ROLES).toContain('Tech Lead');
 		expect(VALID_ROLES).toContain('Creative Lead');
 		expect(VALID_ROLES).toContain('Ops Lead');
+		expect(VALID_ROLES).toContain('Outreach Lead');
+		expect(VALID_ROLES).toContain('Contributor');
 		expect(VALID_ROLES).toContain('Volunteer');
-		expect(VALID_ROLES).toContain('Member');
 	});
 
 	test('MAX_PER_ROLE should be 3', () => {
@@ -43,9 +45,9 @@ describe('validateTeam', () => {
 		const result = validateTeam([]);
 
 		expect(result.isValid).toBe(false);
-		expect(result.issues.length).toBe(3); // Missing all 3 required roles
+		expect(result.issues.length).toBe(4); // Missing all 4 required roles
 		expect(result.completeness).toBe(0);
-		expect(result.missingRoles).toEqual(expect.arrayContaining(['Tech Lead', 'Creative Lead', 'Ops Lead']));
+		expect(result.missingRoles).toEqual(expect.arrayContaining(['Tech Lead', 'Creative Lead', 'Ops Lead', 'Outreach Lead']));
 	});
 
 	test('should return valid for complete team with all required roles', () => {
@@ -53,6 +55,7 @@ describe('validateTeam', () => {
 			{ discordId: 'user1', role: 'Tech Lead' },
 			{ discordId: 'user2', role: 'Creative Lead' },
 			{ discordId: 'user3', role: 'Ops Lead' },
+			{ discordId: 'user4', role: 'Outreach Lead' },
 		];
 
 		const result = validateTeam(teamMembers);
@@ -68,6 +71,7 @@ describe('validateTeam', () => {
 		const teamMembers = [
 			{ discordId: 'user1', role: 'Creative Lead' },
 			{ discordId: 'user2', role: 'Ops Lead' },
+			{ discordId: 'user3', role: 'Outreach Lead' },
 		];
 
 		const result = validateTeam(teamMembers);
@@ -80,13 +84,14 @@ describe('validateTeam', () => {
 				severity: 'critical',
 			})
 		);
-		expect(result.completeness).toBe(67); // 2/3 * 100, rounded
+		expect(result.completeness).toBe(75); // 3/4 * 100
 	});
 
 	test('should detect missing Creative Lead', () => {
 		const teamMembers = [
 			{ discordId: 'user1', role: 'Tech Lead' },
 			{ discordId: 'user2', role: 'Ops Lead' },
+			{ discordId: 'user3', role: 'Outreach Lead' },
 		];
 
 		const result = validateTeam(teamMembers);
@@ -105,6 +110,7 @@ describe('validateTeam', () => {
 		const teamMembers = [
 			{ discordId: 'user1', role: 'Tech Lead' },
 			{ discordId: 'user2', role: 'Creative Lead' },
+			{ discordId: 'user3', role: 'Outreach Lead' },
 		];
 
 		const result = validateTeam(teamMembers);
@@ -119,15 +125,35 @@ describe('validateTeam', () => {
 		);
 	});
 
+	test('should detect missing Outreach Lead', () => {
+		const teamMembers = [
+			{ discordId: 'user1', role: 'Tech Lead' },
+			{ discordId: 'user2', role: 'Creative Lead' },
+			{ discordId: 'user3', role: 'Ops Lead' },
+		];
+
+		const result = validateTeam(teamMembers);
+
+		expect(result.isValid).toBe(false);
+		expect(result.issues).toContainEqual(
+			expect.objectContaining({
+				type: 'missing_role',
+				role: 'Outreach Lead',
+				severity: 'critical',
+			})
+		);
+	});
+
 	test('should warn about overcrowded role', () => {
 		const teamMembers = [
 			{ discordId: 'user1', role: 'Tech Lead' },
 			{ discordId: 'user2', role: 'Creative Lead' },
 			{ discordId: 'user3', role: 'Ops Lead' },
-			{ discordId: 'user4', role: 'Volunteer' },
-			{ discordId: 'user5', role: 'Volunteer' },
-			{ discordId: 'user6', role: 'Volunteer' },
-			{ discordId: 'user7', role: 'Volunteer' }, // 4 volunteers - over limit
+			{ discordId: 'user4', role: 'Outreach Lead' },
+			{ discordId: 'user5', role: 'Contributor' },
+			{ discordId: 'user6', role: 'Contributor' },
+			{ discordId: 'user7', role: 'Contributor' },
+			{ discordId: 'user8', role: 'Contributor' }, // 4 contributors - over limit
 		];
 
 		const result = validateTeam(teamMembers);
@@ -137,7 +163,7 @@ describe('validateTeam', () => {
 		expect(result.warnings).toContainEqual(
 			expect.objectContaining({
 				type: 'overcrowded_role',
-				role: 'Volunteer',
+				role: 'Contributor',
 				count: 4,
 				severity: 'warning',
 			})
@@ -170,6 +196,7 @@ describe('validateTeam', () => {
 			{ discordId: 'user2', role: 'Tech Lead' }, // 2 Tech Leads
 			{ discordId: 'user3', role: 'Creative Lead' },
 			{ discordId: 'user4', role: 'Ops Lead' },
+			{ discordId: 'user5', role: 'Outreach Lead' },
 		];
 
 		const result = validateTeam(teamMembers);
@@ -177,6 +204,7 @@ describe('validateTeam', () => {
 		expect(result.roleCounts['Tech Lead']).toBe(2);
 		expect(result.roleCounts['Creative Lead']).toBe(1);
 		expect(result.roleCounts['Ops Lead']).toBe(1);
+		expect(result.roleCounts['Outreach Lead']).toBe(1);
 	});
 
 	test('should calculate completeness correctly for partial team', () => {
@@ -186,24 +214,25 @@ describe('validateTeam', () => {
 
 		const result = validateTeam(teamMembers);
 
-		expect(result.completeness).toBe(33); // 1/3 * 100, rounded
-		expect(result.completenessPoints).toBe(7); // 1/3 * 20, rounded
+		expect(result.completeness).toBe(25); // 1/4 * 100
+		expect(result.completenessPoints).toBe(5); // 1/4 * 20
 	});
 
-	test('should handle team with volunteers and members', () => {
+	test('should handle team with contributors and legacy volunteers', () => {
 		const teamMembers = [
 			{ discordId: 'user1', role: 'Tech Lead' },
 			{ discordId: 'user2', role: 'Creative Lead' },
 			{ discordId: 'user3', role: 'Ops Lead' },
-			{ discordId: 'user4', role: 'Volunteer' },
-			{ discordId: 'user5', role: 'Member' },
+			{ discordId: 'user4', role: 'Outreach Lead' },
+			{ discordId: 'user5', role: 'Contributor' },
+			{ discordId: 'user6', role: 'Volunteer' },
 		];
 
 		const result = validateTeam(teamMembers);
 
 		expect(result.isValid).toBe(true);
+		expect(result.roleCounts['Contributor']).toBe(1);
 		expect(result.roleCounts['Volunteer']).toBe(1);
-		expect(result.roleCounts['Member']).toBe(1);
 	});
 
 	test('should return correct filledRoles count', () => {
@@ -215,7 +244,7 @@ describe('validateTeam', () => {
 		const result = validateTeam(teamMembers);
 
 		expect(result.filledRoles).toBe(2);
-		expect(result.totalRequiredRoles).toBe(3);
+		expect(result.totalRequiredRoles).toBe(4);
 	});
 });
 
@@ -232,12 +261,16 @@ describe('getRoleEmoji', () => {
 		expect(getRoleEmoji('Ops Lead')).toBe('📋');
 	});
 
-	test('should return correct emoji for Volunteer', () => {
-		expect(getRoleEmoji('Volunteer')).toBe('🤝');
+	test('should return correct emoji for Outreach Lead', () => {
+		expect(getRoleEmoji('Outreach Lead')).toBe('📢');
 	});
 
-	test('should return correct emoji for Member', () => {
-		expect(getRoleEmoji('Member')).toBe('👤');
+	test('should return correct emoji for Contributor', () => {
+		expect(getRoleEmoji('Contributor')).toBe('🤝');
+	});
+
+	test('should return correct emoji for Volunteer', () => {
+		expect(getRoleEmoji('Volunteer')).toBe('🤝');
 	});
 
 	test('should return default emoji for unknown role', () => {
@@ -252,6 +285,7 @@ describe('formatTeamDisplay', () => {
 		expect(result).toContain('🎯 **Tech Lead**: ⚠️ MISSING');
 		expect(result).toContain('🎨 **Creative Lead**: ⚠️ MISSING');
 		expect(result).toContain('📋 **Ops Lead**: ⚠️ MISSING');
+		expect(result).toContain('📢 **Outreach Lead**: ⚠️ MISSING');
 	});
 
 	test('should format complete team correctly', () => {
@@ -259,6 +293,7 @@ describe('formatTeamDisplay', () => {
 			{ discordId: 'user1', role: 'Tech Lead' },
 			{ discordId: 'user2', role: 'Creative Lead' },
 			{ discordId: 'user3', role: 'Ops Lead' },
+			{ discordId: 'user4', role: 'Outreach Lead' },
 		];
 
 		const result = formatTeamDisplay(teamMembers);
@@ -266,6 +301,7 @@ describe('formatTeamDisplay', () => {
 		expect(result).toContain('🎯 **Tech Lead**: <@user1> ✅');
 		expect(result).toContain('🎨 **Creative Lead**: <@user2> ✅');
 		expect(result).toContain('📋 **Ops Lead**: <@user3> ✅');
+		expect(result).toContain('📢 **Outreach Lead**: <@user4> ✅');
 	});
 
 	test('should show MISSING for unfilled required roles', () => {
@@ -278,21 +314,23 @@ describe('formatTeamDisplay', () => {
 		expect(result).toContain('🎯 **Tech Lead**: <@user1> ✅');
 		expect(result).toContain('🎨 **Creative Lead**: ⚠️ MISSING');
 		expect(result).toContain('📋 **Ops Lead**: ⚠️ MISSING');
+		expect(result).toContain('📢 **Outreach Lead**: ⚠️ MISSING');
 	});
 
-	test('should include volunteers and members', () => {
+	test('should include contributors and legacy volunteers', () => {
 		const teamMembers = [
 			{ discordId: 'user1', role: 'Tech Lead' },
 			{ discordId: 'user2', role: 'Creative Lead' },
 			{ discordId: 'user3', role: 'Ops Lead' },
-			{ discordId: 'user4', role: 'Volunteer' },
-			{ discordId: 'user5', role: 'Member' },
+			{ discordId: 'user4', role: 'Outreach Lead' },
+			{ discordId: 'user5', role: 'Contributor' },
+			{ discordId: 'user6', role: 'Volunteer' },
 		];
 
 		const result = formatTeamDisplay(teamMembers);
 
-		expect(result).toContain('🤝 **Volunteer**: <@user4>');
-		expect(result).toContain('👤 **Member**: <@user5>');
+		expect(result).toContain('🤝 **Contributor**: <@user5>');
+		expect(result).toContain('🤝 **Volunteer**: <@user6>');
 	});
 
 	test('should handle multiple members in same role', () => {
@@ -301,6 +339,7 @@ describe('formatTeamDisplay', () => {
 			{ discordId: 'user2', role: 'Tech Lead' },
 			{ discordId: 'user3', role: 'Creative Lead' },
 			{ discordId: 'user4', role: 'Ops Lead' },
+			{ discordId: 'user5', role: 'Outreach Lead' },
 		];
 
 		const result = formatTeamDisplay(teamMembers);
@@ -316,7 +355,7 @@ describe('getTeamStats', () => {
 		expect(result.totalMembers).toBe(0);
 		expect(result.totalAssignments).toBe(0);
 		expect(result.completeness).toBe(0);
-		expect(result.missingRoles).toEqual(expect.arrayContaining(['Tech Lead', 'Creative Lead', 'Ops Lead']));
+		expect(result.missingRoles).toEqual(expect.arrayContaining(['Tech Lead', 'Creative Lead', 'Ops Lead', 'Outreach Lead']));
 		expect(result.hasIssues).toBe(true);
 		expect(result.hasWarnings).toBe(false);
 	});
@@ -326,12 +365,13 @@ describe('getTeamStats', () => {
 			{ discordId: 'user1', role: 'Tech Lead' },
 			{ discordId: 'user2', role: 'Creative Lead' },
 			{ discordId: 'user3', role: 'Ops Lead' },
+			{ discordId: 'user4', role: 'Outreach Lead' },
 		];
 
 		const result = getTeamStats(teamMembers);
 
-		expect(result.totalMembers).toBe(3);
-		expect(result.totalAssignments).toBe(3);
+		expect(result.totalMembers).toBe(4);
+		expect(result.totalAssignments).toBe(4);
 		expect(result.completeness).toBe(100);
 		expect(result.missingRoles).toEqual([]);
 		expect(result.hasIssues).toBe(false);
@@ -343,12 +383,13 @@ describe('getTeamStats', () => {
 			{ discordId: 'user1', role: 'Tech Lead' },
 			{ discordId: 'user1', role: 'Creative Lead' }, // Same user, different role
 			{ discordId: 'user2', role: 'Ops Lead' },
+			{ discordId: 'user3', role: 'Outreach Lead' },
 		];
 
 		const result = getTeamStats(teamMembers);
 
-		expect(result.totalMembers).toBe(2); // 2 unique members
-		expect(result.totalAssignments).toBe(3); // 3 role assignments
+		expect(result.totalMembers).toBe(3); // 3 unique members
+		expect(result.totalAssignments).toBe(4); // 4 role assignments
 	});
 
 	test('should detect warnings', () => {
@@ -356,10 +397,11 @@ describe('getTeamStats', () => {
 			{ discordId: 'user1', role: 'Tech Lead' },
 			{ discordId: 'user2', role: 'Creative Lead' },
 			{ discordId: 'user3', role: 'Ops Lead' },
-			{ discordId: 'user4', role: 'Volunteer' },
-			{ discordId: 'user5', role: 'Volunteer' },
-			{ discordId: 'user6', role: 'Volunteer' },
-			{ discordId: 'user7', role: 'Volunteer' }, // Overcrowded
+			{ discordId: 'user4', role: 'Outreach Lead' },
+			{ discordId: 'user5', role: 'Contributor' },
+			{ discordId: 'user6', role: 'Contributor' },
+			{ discordId: 'user7', role: 'Contributor' },
+			{ discordId: 'user8', role: 'Contributor' }, // Overcrowded
 		];
 
 		const result = getTeamStats(teamMembers);

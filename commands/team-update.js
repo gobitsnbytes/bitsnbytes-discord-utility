@@ -27,8 +27,12 @@ module.exports = {
 					{ name: '🎯 Tech Lead', value: 'Tech Lead' },
 					{ name: '🎨 Creative Lead', value: 'Creative Lead' },
 					{ name: '📋 Ops Lead', value: 'Ops Lead' },
-					{ name: '🤝 Volunteer', value: 'Volunteer' },
-					{ name: '👤 Member', value: 'Member' },
+					{ name: '📢 Outreach Lead', value: 'Outreach Lead' },
+					{ name: '💻 Tech Contributor', value: 'Tech Contributor' },
+					{ name: '🖌️ Creative Contributor', value: 'Creative Contributor' },
+					{ name: '⚙️ Ops Contributor', value: 'Ops Contributor' },
+					{ name: '📣 Outreach Contributor', value: 'Outreach Contributor' },
+					{ name: '🤝 Contributor', value: 'Contributor' },
 				))
 		.addStringOption(option =>
 			option

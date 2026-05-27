@@ -170,6 +170,7 @@ describe('Channel Permissions Sync Tests', () => {
 			},
 			channels: {
 				cache: {
+					get: jest.fn().mockReturnValue(null),
 					find: jest.fn().mockImplementation((fn) => {
 						const dummyChannel = { name: 'gobitsnbytes-delhi' };
 						if (fn(dummyChannel)) return mockChannel;
