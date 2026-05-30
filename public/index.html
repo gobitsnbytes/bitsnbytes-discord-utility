@@ -304,7 +304,7 @@
                     let forksHtml = '';
 
                     Object.entries(forksMap).forEach(([city, cityUsers]) => {
-                        const isMyCity = myCity && city.toLowerCase() === myCity.toLowerCase();
+                        const isMyCity = (me.role === 'exec_leader' || me.role === 'dep_lead') || (myCity && city.toLowerCase() === myCity.toLowerCase());
                         let filteredCityUsers = cityUsers;
                         let noticeText = '';
                         
