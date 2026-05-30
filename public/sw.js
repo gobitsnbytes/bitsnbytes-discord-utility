@@ -1,9 +1,9 @@
 /**
- * Bits&Bytes Scheduler — Service Worker
- * Handles push notifications and offline caching for the scheduler PWA.
+ * chrono — Service Worker
+ * Handles push notifications and offline caching for the PWA.
  */
 
-const CACHE_NAME = 'bnb-scheduler-v1';
+const CACHE_NAME = 'chrono-v1';
 const STATIC_ASSETS = [
 	'/',
 	'/style.css',
@@ -52,7 +52,7 @@ self.addEventListener('fetch', (event) => {
 
 // Push: handle incoming push notifications
 self.addEventListener('push', (event) => {
-	let data = { title: 'Bits&Bytes Scheduler', body: 'You have a new notification.' };
+	let data = { title: 'chrono', body: 'You have a new notification.' };
 
 	try {
 		if (event.data) {

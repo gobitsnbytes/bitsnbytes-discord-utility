@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bits&Bytes Scheduler // Network Sync Portal</title>
+    <title>chrono</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="stylesheet" href="/style.css">
 </head>
@@ -11,7 +11,7 @@
     <header>
         <div class="logo-container">
             <img src="https://gobitsnbytes.org/logo" alt="Bits&Bytes Logo">
-            <span class="logo-text">bits&bytes // scheduler</span>
+            <span class="logo-text">chrono</span>
         </div>
         <div class="nav-links" id="nav-links">
             <a href="/login" class="btn btn-primary" id="login-btn">
@@ -32,7 +32,9 @@
         <!-- Instant Meeting Launcher (contributors only) -->
         <div class="instant-meet-launcher" id="instant-meet-launcher">
             <div class="instant-meet-launcher-header">
-                <div class="lightning-icon">⚡</div>
+                <div class="lightning-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand);"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                </div>
                 <h3>Start Instant Meeting</h3>
             </div>
             <p class="launcher-desc">Launch a live voice session right now. A unique meeting link will be generated and a Discord VC will be provisioned instantly.</p>
@@ -67,7 +69,12 @@
         <div class="users-grid" id="hosts-grid">
             <!-- Dynamically populated -->
             <div class="empty-state" id="loading-indicator" style="grid-column: 1 / -1; border-style: solid;">
-                <div class="empty-icon">⏳</div>
+                <div class="empty-icon">
+                    <svg class="animate-spin" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite; opacity: 0.5;">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.2"></circle>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-linecap="round"></path>
+                    </svg>
+                </div>
                 <h2>Loading team members</h2>
                 <p>Connecting to database, please hold...</p>
             </div>
@@ -156,14 +163,16 @@
             `;
         }
 
-        function renderSection(title, cardsHtml, isCollapsed = false, icon = '📁') {
+        function renderSection(title, cardsHtml, isCollapsed = false) {
             if (!cardsHtml) return '';
             const collapsedClass = isCollapsed ? 'collapsed' : '';
             return `
                 <div class="collapsible-section ${collapsedClass}">
                     <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
-                        <h2><span>${icon}</span> ${title}</h2>
-                        <span class="chevron">▼</span>
+                        <h2>${title}</h2>
+                        <span class="chevron">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </span>
                     </div>
                     <div class="collapsible-wrapper">
                         <div class="collapsible-inner">
@@ -215,7 +224,9 @@
                 if (users.length === 0) {
                     grid.innerHTML = `
                         <div class="empty-state" style="grid-column: 1 / -1;">
-                            <div class="empty-icon">📭</div>
+                            <div class="empty-icon">
+                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.6; margin-bottom: 1rem;"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>
+                            </div>
                             <h2>No team members registered yet</h2>
                             <p>If you are a member of the network, log in using the button above to configure your availability and booking link.</p>
                         </div>
@@ -230,7 +241,9 @@
                     if (forkUsers.length === 0) {
                         grid.innerHTML = `
                             <div class="empty-state" style="grid-column: 1 / -1;">
-                                <div class="empty-icon">📭</div>
+                                <div class="empty-icon">
+                                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.6; margin-bottom: 1rem;"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>
+                                </div>
                                 <h2>No team members registered for this Fork yet</h2>
                                 <p>Check back later or register availability if you are a lead of this fork.</p>
                             </div>
@@ -243,8 +256,8 @@
                     const teamUsers = forkUsers.filter(u => u.role !== 'fork_lead');
 
                     let html = '';
-                    html += renderSection('Fork Leadership', leadUsers.map(renderUserCard).join(''), false, '👑');
-                    html += renderSection('Fork Team Members', teamUsers.map(renderUserCard).join(''), false, '👥');
+                    html += renderSection('Fork Leadership', leadUsers.map(renderUserCard).join(''), false);
+                    html += renderSection('Fork Team Members', teamUsers.map(renderUserCard).join(''), false);
                     grid.innerHTML = html;
                     grid.style.display = 'block';
                     return;
@@ -273,15 +286,15 @@
                         const filteredCityUsers = cityUsers.filter(u => u.role === 'fork_lead');
                         forksHtml += `
                             <div style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem;">
-                                <h3 style="font-size: 1rem; margin-bottom: 1rem; color: var(--muted-foreground);">📍 ${city} Fork</h3>
+                                <h3 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 1rem; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.05em;">${city} Fork</h3>
                                 <div class="users-grid">${filteredCityUsers.map(renderUserCard).join('')}</div>
                             </div>
                         `;
                     });
 
                     let finalHtml = '';
-                    finalHtml += renderSection('Bits&Bytes Leadership', coreUsers.map(renderUserCard).join(''), false, '👑');
-                    finalHtml += renderSection('Bits&Bytes Forks', forksHtml || '<p style="font-size:0.9rem; color:var(--muted-foreground); margin:0;">No forks registered yet.</p>', true, '📍');
+                    finalHtml += renderSection('Bits&Bytes Leadership', coreUsers.map(renderUserCard).join(''), false);
+                    finalHtml += renderSection('Bits&Bytes Forks', forksHtml || '<p style="font-size:0.9rem; color:var(--muted-foreground); margin:0;">No forks registered yet.</p>', true);
                     
                     grid.innerHTML = finalHtml;
                 } else {
@@ -313,14 +326,17 @@
                             // Scoped access: strangers and members from other forks only see Fork Lead
                             filteredCityUsers = cityUsers.filter(u => u.role === 'fork_lead');
                             if (cityUsers.length > filteredCityUsers.length) {
-                                noticeText = `<p style="font-size: 0.8rem; color: var(--muted-foreground); margin-bottom: 0.8rem;">ℹ️ Restricting view to Fork Lead. Logged-in team members only see their own fork's full team structure.</p>`;
+                                noticeText = `<p style="font-size: 0.8rem; color: var(--muted-foreground); margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.4rem;">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                                    Restricting view to Fork Lead. Logged-in team members only see their own fork's full team structure.
+                                </p>`;
                             }
                         }
 
                         forksHtml += `
                             <div style="margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1.5rem;">
-                                <h3 style="font-size: 1rem; margin-bottom: 0.5rem; color: ${isMyCity ? 'var(--brand)' : 'var(--primary)'};">
-                                    📍 ${city} Fork ${isMyCity ? '(My Fork)' : ''}
+                                <h3 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: ${isMyCity ? 'var(--brand)' : 'var(--primary)'}; text-transform: uppercase; letter-spacing: 0.05em;">
+                                    ${city} Fork ${isMyCity ? '(My Fork)' : ''}
                                 </h3>
                                 ${noticeText}
                                 <div class="users-grid">${filteredCityUsers.map(renderUserCard).join('')}</div>
@@ -329,14 +345,16 @@
                     });
 
                     let finalHtml = '';
-                    const coreLeadsHtml = renderSection('Executive & Department Leadership', coreLeads.map(renderUserCard).join(''), false, '👑');
-                    const coreContribsHtml = renderSection('Contributors', coreContributors.map(renderUserCard).join(''), true, '👥');
+                    const coreLeadsHtml = renderSection('Executive & Department Leadership', coreLeads.map(renderUserCard).join(''), false);
+                    const coreContribsHtml = renderSection('Contributors', coreContributors.map(renderUserCard).join(''), true);
                     
                     finalHtml += `
                         <div class="collapsible-section">
                             <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
-                                <h2>💼 Bits&Bytes Core Team</h2>
-                                <span class="chevron">▼</span>
+                                <h2>Bits&Bytes Core Team</h2>
+                                <span class="chevron">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                </span>
                             </div>
                             <div class="section-content" style="padding: 1.75rem 1.75rem 0.5rem 1.75rem;">
                                 ${coreLeadsHtml}
@@ -345,7 +363,7 @@
                         </div>
                     `;
 
-                    finalHtml += renderSection('Forks Network', forksHtml || '<p style="font-size:0.9rem; color:var(--muted-foreground); margin:0;">No forks registered yet.</p>', false, '📍');
+                    finalHtml += renderSection('Forks Network', forksHtml || '<p style="font-size:0.9rem; color:var(--muted-foreground); margin:0;">No forks registered yet.</p>', false);
                     
                     grid.innerHTML = finalHtml;
                 }
@@ -353,7 +371,9 @@
                 console.error('Failed to load hosts:', err);
                 document.getElementById('hosts-grid').innerHTML = `
                     <div class="empty-state" style="grid-column: 1 / -1; border-color: var(--error);">
-                        <div class="empty-icon" style="color: var(--error);">⚠️</div>
+                        <div class="empty-icon" style="color: var(--error);">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--error);"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                        </div>
                         <h2 style="color: var(--error);">Database Connection Failure</h2>
                         <p>Could not load team schedules. Please check if the Express backend is online and retry.</p>
                         <button onclick="loadHosts()" class="btn btn-secondary" style="margin-top: 1rem;">Retry Connection</button>

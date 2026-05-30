@@ -5,32 +5,33 @@
     --brand: #97192c;
     --brand-hover: #b3243a;
     
-    /* Muted Burgundy-Tinted Neutrals */
-    --bg: #0c0809; /* Deep wine-tinted background */
-    --card: #120e0f; /* Slightly lighter wine-tinted card surface */
-    --card-foreground: #fafafa;
+    /* Vercel / Linear / Cal.com Pure Dark Zinc Palette */
+    --bg: #000000; /* Absolute black */
+    --card: #09090b; /* Zinc 950 */
+    --card-foreground: #fafafa; /* Zinc 50 */
     
-    --border: #2c2022; /* Wine-tinted border line */
-    --input: #1a1213; /* Darker input background */
+    --border: #1f1f23; /* Very subtle thin border */
+    --border-hover: #2e2e33;
+    --input: #09090b;
     
-    --primary: #fafafa;
-    --primary-foreground: #0c0809;
+    --primary: #ffffff; /* Crisp white */
+    --primary-foreground: #000000;
     
-    --secondary: #1d1517; /* Slate-wine secondary */
+    --secondary: #0f0f11; /* Dark gray */
     --secondary-foreground: #fafafa;
     
-    --muted: #1d1517;
-    --muted-foreground: #9a8b8d; /* Warm gray-burgundy */
+    --muted: #0f0f11;
+    --muted-foreground: #88888e; /* Cool gray */
     
-    --accent: #2c2022;
+    --accent: #1f1f23;
     --accent-foreground: #fafafa;
     
     --success: #10b981;
     --error: #f43f5e;
     
-    --radius: 8px;
+    --radius: 6px; /* Razor sharp 6px radius like Vercel/Linear */
     --font-sans: 'Plus Jakarta Sans', sans-serif;
-    --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 * {
@@ -43,8 +44,8 @@
 body {
     background-color: var(--bg);
     background-image: 
-        radial-gradient(circle at top center, rgba(39, 39, 42, 0.15) 0%, transparent 80%),
-        radial-gradient(circle at 10% 20%, rgba(24, 24, 27, 0.3) 0%, transparent 50%);
+        radial-gradient(circle at top center, rgba(151, 25, 44, 0.07) 0%, transparent 60%),
+        radial-gradient(circle at 10% 20%, rgba(24, 24, 27, 0.15) 0%, transparent 50%);
     background-attachment: fixed;
     color: var(--card-foreground);
     min-height: 100vh;

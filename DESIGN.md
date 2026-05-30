@@ -1,5 +1,5 @@
 ---
-name: Bits&Bytes Scheduler Design System
+name: chrono Design System
 description: Sleek tech-minimalist scheduler interface modeled after Cal.com, using a dark zinc palette and brand burgundy accents.
 colors:
   primary: "#fafafa"
@@ -34,13 +34,13 @@ components:
     padding: "8px 20px"
 ---
 
-# Design System: Bits&Bytes Scheduler
+# Design System: chrono
 
 ## 1. Overview
 
 **Creative North Star: "The Monospace Sync"**
 
-The Bits&Bytes Scheduler visual identity is modeled after Cal.com: a clean, high-performance, task-focused interface for developers and chapter leads. The layout utilizes a dark zinc base, sharp borders, clean layouts, and functional typography with a single primary accent role for brand burgundy (#97192c). The system rejects heavy gradients, rounded shapes exceeding 8px, and decorative animations.
+The chrono visual identity is modeled after Cal.com and Vercel: a clean, high-performance, task-focused interface for developers and chapter leads. The layout utilizes a dark zinc base, sharp borders, clean layouts, and functional typography with a single primary accent role for brand burgundy (#97192c). The system rejects heavy gradients, rounded shapes exceeding 8px, and decorative animations.
 
 **Key Characteristics:**
 - **Task-First Clarity**: Components disappear to prioritize slot selection and team member availability inputs.

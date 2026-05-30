@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Book Sync // Bits&Bytes Scheduler</title>
+    <title>chrono</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="stylesheet" href="/style.css">
     <style>
@@ -275,7 +275,7 @@
     <header>
         <div class="logo-container">
             <img src="https://gobitsnbytes.org/logo" alt="Bits&Bytes Logo">
-            <span class="logo-text">bits&bytes // scheduler</span>
+            <span class="logo-text">chrono</span>
         </div>
         <div class="nav-links">
             <a href="/" class="btn btn-secondary">Home</a>
@@ -288,7 +288,7 @@
             <div class="calcom-col host-details-col" id="host-sidebar">
                 <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; color: var(--muted-foreground); font-size: 0.85rem; font-weight: 700;">
                     <img src="https://gobitsnbytes.org/logo" alt="Bits&Bytes" style="height: 18px; width: auto;">
-                    <span>Bits&Bytes Scheduler</span>
+                    <span style="font-size: 0.85rem; font-weight: 700; letter-spacing: -0.02em;">chrono</span>
                 </div>
                 
                 <h3 style="font-size: 0.75rem; font-weight: 700; color: var(--muted-foreground); text-transform: uppercase; margin-bottom: 0.75rem; letter-spacing: 0.05em;">Selected Hosts</h3>
@@ -314,7 +314,8 @@
 
                 <div class="instant-meet-selector" style="margin-bottom: 1.5rem;">
                     <button type="button" class="btn" id="request-instant-btn" style="width: 100%; background-color: #97192c; color: #fafafa; border: 1px solid #97192c; font-weight: 700; font-size: 0.875rem; padding: 0.6rem; border-radius: var(--radius); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: var(--transition);">
-                        <span>⚡ Request Instant Meet</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                        <span>Request Instant Meet</span>
                     </button>
                 </div>
                 
@@ -389,15 +390,17 @@
                 <div id="discord-login-container" style="display: none; margin-top: 1rem; padding: 1rem 0;">
                     <!-- Step Indicator -->
                     <div class="booking-steps" style="display: flex; gap: 0.5rem; margin-bottom: 2rem; align-items: center; justify-content: center; font-family: monospace; font-size: 0.75rem; text-transform: uppercase;">
-                        <span style="color: var(--success);">1. Select Slot ✓</span>
+                        <span style="color: var(--success); font-weight: 500;">1. Slot Selection</span>
                         <span style="color: var(--border);">/</span>
-                        <span style="color: #97192c; font-weight: 700;">2. Verification ●</span>
+                        <span style="color: #97192c; font-weight: 700;">2. Verification</span>
                         <span style="color: var(--border);">/</span>
-                        <span style="color: var(--muted-foreground);">3. Confirm Details ○</span>
+                        <span style="color: var(--muted-foreground); font-weight: 500;">3. Confirmation</span>
                     </div>
 
                     <div style="background: rgba(24, 24, 27, 0.4); border: 1px solid var(--border); border-radius: var(--radius); padding: 2rem; text-align: center;">
-                        <div style="font-size: 2rem; margin-bottom: 1.25rem;">🔒</div>
+                        <div style="font-size: 2rem; margin-bottom: 1.25rem; display: flex; justify-content: center; color: var(--brand);">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        </div>
                         <h4 style="margin-bottom: 0.75rem; font-size: 1.1rem; font-weight: 700; color: var(--primary);">Authentication required</h4>
                         
                         <p style="color: var(--muted-foreground); font-size: 0.875rem; margin-bottom: 2rem; line-height: 1.6; text-align: left; max-width: 480px; margin-left: auto; margin-right: auto;">
@@ -448,12 +451,12 @@
 
                         <!-- Level 1: Audience type -->
                         <select id="scope-audience" class="form-control" style="margin-bottom: 0.6rem;">
-                            <option value="invite">🔒 Invite Only — explicit attendees only</option>
-                            <option value="open">🌐 Open — all BnB members (contributors + HQ)</option>
-                            <option value="hq">🏛️ HQ Only — Foundation team members</option>
-                            <option value="fork">📍 Specific Fork — one city's entire team</option>
-                            <option value="network">🌐 Cross-Network Track — one track across all forks</option>
-                            <option value="fork-track">🔬 Fork + Track — one city's specific track (precise)</option>
+                            <option value="invite">Invite Only — explicit attendees only</option>
+                            <option value="open">Open — all BnB members (contributors + HQ)</option>
+                            <option value="hq">HQ Only — Foundation team members</option>
+                            <option value="fork">Specific Fork — one city's entire team</option>
+                            <option value="network">Cross-Network Track — one track across all forks</option>
+                            <option value="fork-track">Fork + Track — one city's specific track (precise)</option>
                         </select>
 
                         <!-- Level 2a: City selector (shown for fork / fork-track) -->
@@ -463,10 +466,10 @@
 
                         <!-- Level 2b: Track selector (shown for network / fork-track) -->
                         <select id="scope-track" class="form-control" style="display:none;">
-                            <option value="tech">💻 Tech</option>
-                            <option value="creative">🎨 Creative</option>
-                            <option value="ops">⚙️ Ops</option>
-                            <option value="outreach">📣 Outreach</option>
+                            <option value="tech">Tech</option>
+                            <option value="creative">Creative</option>
+                            <option value="ops">Ops</option>
+                            <option value="outreach">Outreach</option>
                         </select>
 
                         <!-- Composed scope display -->
@@ -630,7 +633,9 @@
             if (!primaryHost) {
                 document.getElementById('booking-flow').innerHTML = `
                     <div class="empty-state" style="grid-column: 1 / -1; border-color: var(--error);">
-                        <div class="empty-icon" style="color: var(--error);">🔍</div>
+                        <div class="empty-icon" style="color: var(--error);">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        </div>
                         <h2 style="color: var(--error);">Host Not Found</h2>
                         <p>The booking handle "@${primaryLink}" does not match any registered team member.</p>
                         <a href="/" class="btn btn-secondary" style="margin-top: 1rem;">Go to Home</a>
@@ -878,7 +883,7 @@
             const dateFormatted = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
             
             if (isInstantMeet) {
-                label.textContent = `⚡ Instant Sync Session (Starts immediately upon host acceptance)`;
+                label.textContent = `Instant Sync Session (Starts immediately upon host acceptance)`;
             } else {
                 label.textContent = `${dateFormatted} at ${selectedTimeSlot} (${primaryHost.timezone})`;
             }
@@ -1009,7 +1014,8 @@
                         document.querySelector('.success-container .subtitle').textContent = `Your request has been dispatched to the host's Discord DM. If accepted, you will receive a calendar invite and a Discord VC will open.`;
                         document.querySelector('.notice-card').innerHTML = `
                             <div style="font-weight: 700; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.5rem; color: #ffae24;">
-                                ⚡ Direct Host DM Alert
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #ffae24;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                                <span>Direct Host DM Alert</span>
                             </div>
                             The host has received a direct notification in Discord. Once they click 'Accept', the voice channel will open immediately.
                         `;
@@ -1069,13 +1075,13 @@
                         const banner = document.createElement('div');
                         banner.style.cssText = 'background: rgba(0, 242, 255, 0.08); border: 1px solid rgba(0, 242, 255, 0.15); border-radius: var(--radius); padding: 0.75rem 1rem; font-size: 0.85rem; color: #ff7a1b; margin-bottom: 1rem; text-align: left;';
                         if (userData.isGuest) {
-                            banner.innerHTML = `🟢 Authenticated via Discord as <strong>@${userData.username}</strong> (${userData.email || 'no email registered'})`;
+                            banner.innerHTML = `<span style="display:inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981; margin-right: 0.5rem; transform: translateY(-1px);"></span>Authenticated via Discord as <strong>@${userData.username}</strong> (${userData.email || 'no email registered'})`;
                             const scopeGroup = document.getElementById('scope-group');
                             if (scopeGroup) scopeGroup.style.display = 'none';
                             const forkInviteGroup = document.getElementById('fork-invite-group');
                             if (forkInviteGroup) forkInviteGroup.style.display = 'none';
                         } else {
-                            banner.innerHTML = `🟢 Booking as internal team member <strong>@${userData.username}</strong> (${userData.email || 'no email registered'})`;
+                            banner.innerHTML = `<span style="display:inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981; margin-right: 0.5rem; transform: translateY(-1px);"></span>Booking as internal team member <strong>@${userData.username}</strong> (${userData.email || 'no email registered'})`;
                         }
                         const form = document.getElementById('booking-form');
                         form.insertBefore(banner, form.firstChild);
@@ -1122,28 +1128,28 @@
             switch (audience) {
                 case 'invite':
                     scopeVal = 'invite';
-                    label = '🔒 Invite only — only explicit attendees can join';
+                    label = 'Invite only — only explicit attendees can join';
                     break;
                 case 'open':
                     scopeVal = 'open';
-                    label = '🌐 Open — all contributors + HQ members';
+                    label = 'Open — all contributors + HQ members';
                     break;
                 case 'hq':
                     scopeVal = 'hq';
-                    label = '🏛️ HQ — Foundation team only';
+                    label = 'HQ — Foundation team only';
                     break;
                 case 'fork':
                     scopeVal = city ? `fork:${city}` : 'invite';
-                    label = city ? `📍 Entire ${city} fork` : '— pick a fork above';
+                    label = city ? `Entire ${city} fork` : '— pick a fork above';
                     break;
                 case 'network':
                     scopeVal = `network:${track}`;
-                    label = `🌐 All ${track} members across every fork`;
+                    label = `All ${track} members across every fork`;
                     break;
                 case 'fork-track':
                     scopeVal = (city && track) ? `fork:${city}:${track}` : 'invite';
                     label = (city && track)
-                        ? `🔬 ${city} fork — ${track} team only (precise intersection)`
+                        ? `${city} fork — ${track} team only (precise intersection)`
                         : '— pick a fork and track above';
                     break;
                 default:

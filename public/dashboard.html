@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard // Bits&Bytes Scheduler</title>
+    <title>chrono // dashboard</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="stylesheet" href="/style.css">
     <style>
@@ -90,7 +90,7 @@
     <header>
         <div class="logo-container">
             <img src="https://gobitsnbytes.org/logo" alt="Bits&Bytes Logo">
-            <span class="logo-text">bits&bytes // scheduler</span>
+            <span class="logo-text">chrono</span>
         </div>
         <div class="nav-links">
             <a href="/" class="btn btn-secondary">Home</a>
@@ -156,13 +156,18 @@
                         <input type="hidden" id="timezone" name="timezone" value="Asia/Kolkata">
                     </div>
 
-                    <div class="form-group" style="background: rgba(252,146,13,0.07); border: 1px solid rgba(252,146,13,0.25); border-radius: var(--radius); padding: 0.85rem 1rem; display: flex; align-items: flex-start; gap: 0.6rem;">
-                        <span style="font-size: 1rem; margin-top: 0.05rem;">📅</span>
-                        <div>
-                            <span style="font-size: 0.8125rem; font-weight: 600; color: #fc920d;">Google Calendar sync is automatic</span>
-                            <span style="font-size: 0.775rem; color: var(--muted-foreground); display: block; margin-top: 0.2rem;">Every booking made through your link is automatically pushed to the BnB Google Calendar via Cal.com — no extra setup needed. Meeting duration determines the event type used.</span>
-                        </div>
-                    </div>
+                     <div class="form-group" style="background: rgba(252,146,13,0.07); border: 1px solid rgba(252,146,13,0.25); border-radius: var(--radius); padding: 0.85rem 1rem; display: flex; align-items: flex-start; gap: 0.6rem;">
+                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fc920d" stroke-width="2" style="margin-top: 0.2rem; flex-shrink: 0;">
+                             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                             <line x1="16" y1="2" x2="16" y2="6"></line>
+                             <line x1="8" y1="2" x2="8" y2="6"></line>
+                             <line x1="3" y1="10" x2="21" y2="10"></line>
+                         </svg>
+                         <div>
+                             <span style="font-size: 0.8125rem; font-weight: 600; color: #fc920d;">Google Calendar sync is automatic</span>
+                             <span style="font-size: 0.775rem; color: var(--muted-foreground); display: block; margin-top: 0.2rem;">Every booking made through your link is automatically pushed to the BnB Google Calendar via Cal.com — no extra setup needed. Meeting duration determines the event type used.</span>
+                         </div>
+                     </div>
 
                     <h3 style="margin: 3rem 0 1rem 0; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">Weekly Availability Hours</h3>
 
@@ -366,13 +371,13 @@
                 }
             });
             // Brief flash on the button for feedback
-            const btn = document.querySelector(`#row-${sourceDay} .copy-row-btn`);
-            if (btn) {
-                const original = btn.textContent;
-                btn.textContent = 'Done ✓';
-                btn.style.color = '#22c55e';
-                setTimeout(() => { btn.textContent = original; btn.style.color = ''; }, 1500);
-            }
+             const btn = document.querySelector(`#row-${sourceDay} .copy-row-btn`);
+             if (btn) {
+                 const original = btn.textContent;
+                 btn.textContent = 'Applied';
+                 btn.style.color = '#22c55e';
+                 setTimeout(() => { btn.textContent = original; btn.style.color = ''; }, 1500);
+             }
         }
 
         function showAlert(msg, type = 'success') {
@@ -428,10 +433,10 @@
                     linkText.style.color = 'var(--primary)';
                 }
 
-                if (user.associated_role_name) {
-                    document.getElementById('associated-fork-container').style.display = 'block';
-                    document.getElementById('associated-fork-label').textContent = `👥 ${user.associated_role_name}`;
-                } else {
+                 if (user.associated_role_name) {
+                     document.getElementById('associated-fork-container').style.display = 'block';
+                     document.getElementById('associated-fork-label').textContent = user.associated_role_name;
+                 } else {
                     document.getElementById('associated-fork-container').style.display = 'none';
                 }
 

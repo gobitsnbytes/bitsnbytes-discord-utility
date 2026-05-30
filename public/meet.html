@@ -3,8 +3,8 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Meeting // Bits&Bytes Scheduler</title>
-	<meta name="description" content="View meeting details, join the voice channel, or reschedule — Bits&Bytes Scheduler">
+	<title>chrono // meeting</title>
+	<meta name="description" content="View meeting details, join the voice channel, or reschedule — chrono">
 	<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 	<link rel="stylesheet" href="/style.css">
 </head>
@@ -12,7 +12,7 @@
 	<header>
 		<div class="logo-container">
 			<img src="https://gobitsnbytes.org/logo" alt="Bits&Bytes Logo">
-			<span class="logo-text">bits&bytes // scheduler</span>
+			<span class="logo-text">chrono</span>
 		</div>
 		<div class="nav-links">
 			<a href="/" class="btn btn-secondary">Home</a>
@@ -28,7 +28,9 @@
 		<!-- Error State -->
 		<div id="error-state" style="display: none;">
 			<div class="glass-card" style="text-align: center; max-width: 500px; margin: 0 auto;">
-				<div style="font-size: 2.5rem; margin-bottom: 1rem;">🔍</div>
+				<div style="font-size: 2.5rem; margin-bottom: 1rem; display: flex; justify-content: center; color: var(--brand);">
+					<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+				</div>
 				<h2 style="color: var(--error); margin-bottom: 0.5rem;">Meeting Not Found</h2>
 				<p id="error-message" style="color: var(--muted-foreground); font-size: 0.875rem; margin-bottom: 1.5rem;">The meeting code does not match any scheduled session.</p>
 				<a href="/" class="btn btn-secondary">Return Home</a>
@@ -42,7 +44,7 @@
 				<div class="meet-attendees-col">
 					<div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; color: var(--muted-foreground); font-size: 0.85rem; font-weight: 700;">
 						<img src="https://gobitsnbytes.org/logo" alt="Bits&Bytes" style="height: 18px; width: auto;">
-						<span>Bits&Bytes Scheduler</span>
+						<span style="font-size: 0.85rem; font-weight: 700; letter-spacing: -0.02em;">chrono</span>
 					</div>
 
 					<h3 style="font-size: 0.75rem; font-weight: 700; color: var(--muted-foreground); text-transform: uppercase; margin-bottom: 0.5rem; letter-spacing: 0.05em;">Participants</h3>
@@ -146,8 +148,11 @@
 			<!-- Reschedule History (below card) -->
 			<div id="history-section" class="meet-history-section" style="display: none;">
 				<button type="button" id="history-toggle" class="meet-history-toggle">
-					<span>📋 Reschedule History</span>
-					<span id="history-arrow">▼</span>
+					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+					<span>Reschedule History</span>
+					<span id="history-arrow">
+						<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+					</span>
 				</button>
 				<div id="history-list-wrapper" class="meet-history-list-wrapper">
 					<div class="meet-history-list-inner">
@@ -179,7 +184,7 @@
 					return;
 				}
 				meetingData = await res.json();
-				document.title = `${meetingData.title} // Bits&Bytes Scheduler`;
+				document.title = `${meetingData.title} // chrono`;
 				renderMeeting();
 				loadParticipants();
 			} catch (err) {
@@ -353,7 +358,7 @@
 				item.className = 'meet-history-item';
 				item.innerHTML = `
 					<div class="history-meta">
-						<span>🔄</span>
+						<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7;"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M16 3h5v5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 21H3v-5"></path></svg>
 						<span>Rescheduled by ${entry.rescheduled_by_name || entry.rescheduled_by} · ${at.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata' })}</span>
 					</div>
 					<div class="history-times">

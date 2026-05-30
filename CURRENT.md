@@ -545,14 +545,14 @@ The dashboard pulls data from:
 
 ---
 
-## 🎙️ Feature 9: Meeting Scheduler & Voice Agent
+## 🎙️ Feature 9: chrono — Meeting Scheduler & Voice Agent
 
 ### Description
-Exposes a web scheduling portal (`cal.gobnb.org`) for members to book sync sessions, links bookings with Cal.com/Google Calendar, provisions temporary Discord Voice Channels, plays legal consent warnings, records the audio, transcribes it with Gemini, and delivers formatted briefs. Also includes a meeting landing/reschedule interface, contributor instant meeting launcher, Web Push notification architecture, and Discord avatar synchronization.
+Exposes a web scheduling portal (`chrono` hosted at `cal.gobnb.org`) for members to book sync sessions, links bookings with Cal.com/Google Calendar, provisions temporary Discord Voice Channels, plays legal consent warnings, records the audio, transcribes it with Gemini, and delivers formatted briefs. Also includes a meeting landing/reschedule interface, contributor instant meeting launcher, Web Push notification architecture, and Discord avatar synchronization.
 
 ### Key Workflows
 1. **Web Scheduler Portal (`cal.gobnb.org`):**
-   - Built with raw responsive HTML/JS and Svelte-like Vanilla CSS in `public/style.css`.
+   - Built with raw responsive HTML/JS and Svelte-like Vanilla CSS in `public/style.css` matching Vercel/Linear dark aesthetics.
    - Supports display titles, custom bios, timezone configurations, and weekly availability selectors.
    - Provides a multi-host selection system (combining schedules for multiple leads) and custom meeting durations.
    - Enforces Discord OAuth2 authentication for all guest bookings, automatically adding them to the server (via `guilds.join` scope), resolving their Discord IDs, and locking pre-filled details.

@@ -8,3 +8,6 @@ bnb-bot-prd.md
 data/
 *.db
 *.sqlite
+
+# Scratch files
+scratch/
