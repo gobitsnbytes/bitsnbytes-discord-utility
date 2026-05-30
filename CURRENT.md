@@ -71,16 +71,17 @@ Tracks bi-weekly/monthly report submissions from fork leads with automated remin
 ### Commands
 
 #### `/report-submit`
-Submit a fork report.
+Submit a fork report. If run without parameters, triggers an interactive message with a button to open a Discord Modal Form submission flow.
 
 **Options:**
-- `city` (required): Fork city
-- `type` (required): `monthly` or `bi-weekly`
+- `city` (optional): Fork city
+- `type` (optional): `monthly` or `bi-weekly`
 - `attachment` (optional): URL to PDF attachment
 - `notes` (optional): Additional notes
 
 **Example Usage:**
 ```
+/report-submit
 /report-submit city:Mumbai type:monthly notes:Great progress this month!
 ```
 
@@ -117,7 +118,7 @@ Reports are stored in the `NOTION_REPORTS_DB` database with:
 - Status (on-time/late/missing)
 
 ### Files
-- `commands/report-submit.js` - Submit reports
+- `commands/report-submit.js` - Submit reports (supports slash parameters & interactive modal form flow)
 - `commands/report-status.js` - View report status
 - `commands/report-view.js` - View report details
 - `jobs/reportReminders.js` - Automated reminders
@@ -605,6 +606,9 @@ Manually mark a meeting as active, DM any missing invitees, and start recording 
 #### `/meet-transcript`
 Query the database for past sync sessions and retrieve/DM meeting notes.
 
+#### `/dashboard`
+Manage scheduling availability and configure the booking link.
+
 ### Files
 - `server.js` - Schedulers API, OAuth callback, cookie persistence, instant meet handles, meeting page endpoints, push registration
 - `webhookServer.js` - Cal.com instant booking webhook sync and matched attendee registry
@@ -620,6 +624,7 @@ Query the database for past sync sessions and retrieve/DM meeting notes.
 - `commands/meet-schedule.js` - Schedule command
 - `commands/meet-start.js` - Start command
 - `commands/meet-transcript.js` - Retrieval command
+- `commands/dashboard.js` - Open dashboard command
 
 ---
 

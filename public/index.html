@@ -304,11 +304,12 @@
                     let forksHtml = '';
 
                     Object.entries(forksMap).forEach(([city, cityUsers]) => {
-                        const isMyCity = (me.role === 'exec_leader' || me.role === 'dep_lead') || (myCity && city.toLowerCase() === myCity.toLowerCase());
+                        const isMyCity = myCity && city.toLowerCase() === myCity.toLowerCase();
+                        const canViewFull = isMyCity || me.role === 'exec_leader' || me.role === 'dep_lead';
                         let filteredCityUsers = cityUsers;
                         let noticeText = '';
                         
-                        if (!isMyCity) {
+                        if (!canViewFull) {
                             // Scoped access: strangers and members from other forks only see Fork Lead
                             filteredCityUsers = cityUsers.filter(u => u.role === 'fork_lead');
                             if (cityUsers.length > filteredCityUsers.length) {

@@ -1632,4 +1632,14 @@ footer {
     transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), border-color 150ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease;
 }
 
+/* Custom Searchable Timezone Item Transition */
+.timezone-item {
+    transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), color 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Button Active Press Scaling (Emil Kowalski Principle) */
+.btn:active, .avail-action-btn:active, .copy-btn:active, .slot-btn-vertical:active, .btn-start-instant:active {
+    transform: scale(0.97) !important;
+}
+
 

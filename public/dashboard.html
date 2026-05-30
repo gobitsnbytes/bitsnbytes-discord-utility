@@ -147,15 +147,13 @@
                         <textarea id="description" class="form-control" placeholder="Tell visitors what they can expect from booking a meeting with you..."></textarea>
                     </div>
 
-                    <div class="form-group">
-                        <label for="timezone">Timezone</label>
-                        <select id="timezone" class="form-control">
-                            <option value="Asia/Kolkata">Asia/Kolkata (IST - UTC+5:30)</option>
-                            <option value="UTC">UTC (Coordinated Universal Time)</option>
-                            <option value="America/New_York">America/New_York (EST/EDT)</option>
-                            <option value="Europe/London">Europe/London (GMT/BST)</option>
-                            <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
-                        </select>
+                    <div class="form-group" style="position: relative;">
+                        <label for="timezone-search">Timezone</label>
+                        <input type="text" id="timezone-search" class="form-control" placeholder="Search timezone (e.g. Kolkata, New York)..." autocomplete="off" style="width: 100%;">
+                        <div id="timezone-dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 220px; overflow-y: auto; background: #18181b; border: 1px solid var(--border); border-radius: var(--radius); z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-top: 4px;">
+                            <!-- Dynamically populated -->
+                        </div>
+                        <input type="hidden" id="timezone" name="timezone" value="Asia/Kolkata">
                     </div>
 
                     <div class="form-group" style="background: rgba(252,146,13,0.07); border: 1px solid rgba(252,146,13,0.25); border-radius: var(--radius); padding: 0.85rem 1rem; display: flex; align-items: flex-start; gap: 0.6rem;">
@@ -195,6 +193,104 @@
 
     <script>
         const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        
+        const ianaTimezones = [
+            "Africa/Cairo", "Africa/Casablanca", "Africa/Johannesburg", "Africa/Lagos", "Africa/Nairobi",
+            "America/Anchorage", "America/Argentina/Buenos_Aires", "America/Bogota", "America/Caracas",
+            "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Mexico_City",
+            "America/New_York", "America/Phoenix", "America/Sao_Paulo", "America/Toronto", "America/Vancouver",
+            "Asia/Baghdad", "Asia/Bangkok", "Asia/Dubai", "Asia/Hong_Kong", "Asia/Jakarta", "Asia/Jerusalem",
+            "Asia/Kabul", "Asia/Karachi", "Asia/Kathmandu", "Asia/Kolkata", "Asia/Kuala_Lumpur", "Asia/Riyadh",
+            "Asia/Seoul", "Asia/Shanghai", "Asia/Singapore", "Asia/Taipei", "Asia/Tashkent", "Asia/Tokyo",
+            "Atlantic/Azores", "Atlantic/Reykjavik", "Australia/Adelaide", "Australia/Brisbane", "Australia/Darwin",
+            "Australia/Melbourne", "Australia/Perth", "Australia/Sydney", "Europe/Amsterdam", "Europe/Berlin",
+            "Europe/Brussels", "Europe/Bucharest", "Europe/Budapest", "Europe/Dublin", "Europe/Istanbul",
+            "Europe/Kyiv", "Europe/Lisbon", "Europe/London", "Europe/Madrid", "Europe/Moscow", "Europe/Paris",
+            "Europe/Prague", "Europe/Rome", "Europe/Vienna", "Europe/Warsaw", "Europe/Zurich",
+            "Pacific/Auckland", "Pacific/Fiji", "Pacific/Honolulu", "UTC"
+        ];
+
+        const tzSearch = document.getElementById('timezone-search');
+        const tzDropdown = document.getElementById('timezone-dropdown');
+        const tzHidden = document.getElementById('timezone');
+
+        function initTimezoneSelector() {
+            let detectedTz = "Asia/Kolkata";
+            try {
+                detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            } catch (e) {
+                console.warn("Could not auto-detect timezone, defaulting to Asia/Kolkata");
+            }
+            
+            if (!tzHidden.value || tzHidden.value === 'Asia/Kolkata') {
+                updateTimezoneValue(detectedTz);
+            }
+
+            renderDropdownItems(ianaTimezones);
+
+            tzSearch.addEventListener('focus', () => {
+                tzDropdown.style.display = 'block';
+            });
+
+            tzSearch.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                const filtered = ianaTimezones.filter(tz => tz.toLowerCase().includes(query));
+                renderDropdownItems(filtered);
+                tzDropdown.style.display = 'block';
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!tzSearch.contains(e.target) && !tzDropdown.contains(e.target)) {
+                    tzDropdown.style.display = 'none';
+                }
+            });
+        }
+
+        function renderDropdownItems(list) {
+            tzDropdown.innerHTML = '';
+            if (list.length === 0) {
+                const empty = document.createElement('div');
+                empty.style.cssText = 'padding: 0.75rem; font-size: 0.85rem; color: var(--muted-foreground); text-align: center;';
+                empty.textContent = 'No matching timezones found';
+                tzDropdown.appendChild(empty);
+                return;
+            }
+
+            list.forEach(tz => {
+                const item = document.createElement('div');
+                item.className = 'timezone-item';
+                item.style.cssText = 'padding: 0.6rem 0.85rem; font-size: 0.85rem; color: var(--primary); cursor: pointer; transition: all 0.15s ease; border-bottom: 1px solid rgba(255,255,255,0.02);';
+                
+                if (tzHidden.value === tz) {
+                    item.style.background = '#97192c';
+                    item.style.color = '#fafafa';
+                    item.style.fontWeight = '700';
+                }
+
+                item.textContent = tz;
+                item.addEventListener('mouseenter', () => {
+                    if (tzHidden.value !== tz) {
+                        item.style.background = 'rgba(255, 255, 255, 0.05)';
+                    }
+                });
+                item.addEventListener('mouseleave', () => {
+                    if (tzHidden.value !== tz) {
+                        item.style.background = '';
+                    }
+                });
+
+                item.addEventListener('click', () => {
+                    updateTimezoneValue(tz);
+                    tzDropdown.style.display = 'none';
+                });
+                tzDropdown.appendChild(item);
+            });
+        }
+
+        function updateTimezoneValue(tz) {
+            tzHidden.value = tz;
+            tzSearch.value = tz;
+        }
         
 
         // Render day rows with toggle switches and copy-to-all
@@ -322,7 +418,7 @@
                 document.getElementById('booking-link').value = user.booking_link || '';
                 document.getElementById('description').value = user.description || '';
                 if (user.timezone) {
-                    document.getElementById('timezone').value = user.timezone;
+                    updateTimezoneValue(user.timezone);
                 }
                 
                 if (user.booking_link) {
@@ -408,6 +504,7 @@
             }
         });
 
+        initTimezoneSelector();
         loadProfile();
     </script>
 </body>

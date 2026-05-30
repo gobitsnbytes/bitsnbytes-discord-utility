@@ -63,6 +63,7 @@ module.exports = {
 	PRIVACY: {
 		// Original commands
 		forks: true,
+		dashboard: true,
 		help: true,
 		pulse: true,
 		archive: true,

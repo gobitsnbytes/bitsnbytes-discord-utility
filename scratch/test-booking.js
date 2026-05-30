@@ -16,15 +16,18 @@ async function testBooking() {
     const bookingBody = {
         eventTypeId: eventType.id,
         start: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
-        timeZone: 'Asia/Kolkata',
-        language: 'en',
         metadata: {
             discord_meeting_id: 'test-meeting-' + Date.now()
+        },
+        location: {
+            type: 'link',
+            link: 'https://cal.gobitsnbytes.org/m/abc-defg-hij'
         },
         attendee: {
             name: 'Test Booker',
             email: 'hello@gobitsnbytes.org',
-            timeZone: 'Asia/Kolkata'
+            timeZone: 'Asia/Kolkata',
+            language: 'en'
         }
     };
 

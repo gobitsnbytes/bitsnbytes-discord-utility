@@ -82,6 +82,59 @@ module.exports = (client) => {
 				await teamForks.send({ embeds: [embed] });
 			}
 
+			// Localized city-specific channels update
+			for (const f of rankedForks) {
+				const city = (f.fork.properties['What city are you in?']?.rich_text?.[0]?.text?.content || 
+				              f.fork.properties['Fork Name']?.title?.[0]?.text?.content || 
+				              'UNKNOWN').trim();
+				if (city === 'UNKNOWN') continue;
+
+				const channelName = `gobitsnbytes-${city.toLowerCase().replace(/\s+/g, '-')}`;
+				const cityChannel = guild.channels.cache.find(c => c.name === channelName);
+
+				if (cityChannel && cityChannel.isTextBased()) {
+					const localEmbed = new EmbedBuilder()
+						.setTitle(`Weekly Health Update: ${city}`)
+						.setColor(f.healthStatus.color)
+						.setDescription(`Current status: **${f.healthStatus.label}** ${f.healthStatus.emoji}`)
+						.addFields(
+							{ name: 'Health Score', value: `${f.healthScore}/100`, inline: true },
+							{ name: 'Gamification Points', value: `${f.fork.properties['Points']?.number || 0} ⭐`, inline: true }
+						)
+						.addFields({
+							name: 'Score Breakdown',
+							value: `• Last Pulse: ${f.healthBreakdown.pulseRecency}/25\n` +
+							       `• Events: ${f.healthBreakdown.eventsConducted}/25\n` +
+							       `• Team Completeness: ${f.healthBreakdown.teamCompleteness}/20\n` +
+							       `• Reports Submitted: ${f.healthBreakdown.reportSubmission}/15\n` +
+							       `• Partnerships: ${f.healthBreakdown.partnerships}/15`,
+							inline: false
+						})
+						.setTimestamp()
+						.setFooter({ text: 'Bits&Bytes // Weekly Summary' });
+
+					if (f.healthScore < 80) {
+						let actionItems = [];
+						if (f.healthBreakdown.pulseRecency < 25) actionItems.push('• Post a pulse update using `/pulse` to restore recency points.');
+						if (f.healthBreakdown.eventsConducted < 25) actionItems.push('• Coordinate or plan a new event using `/event-create`.');
+						if (f.healthBreakdown.teamCompleteness < 20) actionItems.push('• Complete your team setup roles using `/team-update`.');
+						if (f.healthBreakdown.reportSubmission < 15) actionItems.push('• Submit your bi-weekly or monthly report using `/report-submit`.');
+						
+						if (actionItems.length > 0) {
+							localEmbed.addFields({
+								name: 'Recommended Action Items',
+								value: actionItems.join('\n'),
+								inline: false
+							});
+						}
+					}
+
+					await cityChannel.send({ embeds: [localEmbed] }).catch(err => {
+						console.error(`Failed to send health report to ${channelName}:`, err.message);
+					});
+				}
+			}
+
 			console.log('[JOB] Weekly Health Report sent successfully');
 
 		} catch (error) {

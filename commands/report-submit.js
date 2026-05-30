@@ -1,6 +1,90 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, MessageFlags } = require('discord.js');
 const notion = require('../lib/notion');
 const config = require('../config');
+
+// Shared execution logic to process report submission
+async function processReportSubmission(user, city, type, notes, attachmentUrl, guild) {
+	// Enforce authorization check
+	const auth = require('../lib/auth');
+	const isAuthorized = await auth.isAuthorizedForCity(user, city, guild);
+	if (!isAuthorized) {
+		return {
+			success: false,
+			embed: new EmbedBuilder()
+				.setTitle('Access Denied')
+				.setDescription(`You do not have permission to submit reports for ${city}.`)
+				.setColor(config.COLORS.error)
+				.setFooter({ text: config.BRANDING.footerText })
+		};
+	}
+
+	// Find the fork
+	const fork = await notion.findForkByCity(city);
+	if (!fork) {
+		return {
+			success: false,
+			error: `Fork not found: ${city}`
+		};
+	}
+
+	// Create the report in Notion
+	await notion.createReport({
+		forkId: fork.id,
+		type: type,
+		city: city,
+		notes: notes,
+		attachmentUrl: attachmentUrl,
+		isLate: false, // Will be determined by background checks
+	});
+
+	// Increment reports count
+	await notion.incrementForkReports(fork.id);
+
+	// Award points for report submission
+	try {
+		await notion.updateForkPoints(fork.id, 5);
+	} catch (e) {
+		// Ignore points update errors
+	}
+
+	const embed = new EmbedBuilder()
+		.setTitle(`Report Submitted: ${city}`)
+		.setColor(config.COLORS.success)
+		.setTimestamp()
+		.setFooter({ text: config.BRANDING.footerText })
+		.addFields({
+			name: 'Submission Confirmed',
+			value: `Type: ${type.charAt(0).toUpperCase() + type.slice(1)} Report\nSubmitted: <t:${Math.floor(Date.now() / 1000)}:R>`,
+			inline: false,
+		});
+
+	if (notes) {
+		embed.addFields({
+			name: 'Notes',
+			value: notes.substring(0, 1000),
+			inline: false,
+		});
+	}
+
+	if (attachmentUrl) {
+		embed.addFields({
+			name: 'Attachment',
+			value: `[View Attachment](${attachmentUrl})`,
+			inline: false,
+		});
+	}
+
+	embed.addFields({
+		name: 'Points Awarded',
+		value: '5 points added to the fork.',
+		inline: false,
+	});
+
+	return {
+		success: true,
+		embed
+	};
+}
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -10,12 +94,12 @@ module.exports = {
 			option
 				.setName('city')
 				.setDescription('Fork city')
-				.setRequired(true))
+				.setRequired(false))
 		.addStringOption(option =>
 			option
 				.setName('type')
 				.setDescription('Report type')
-				.setRequired(true)
+				.setRequired(false)
 				.addChoices(
 					{ name: 'Monthly', value: 'monthly' },
 					{ name: 'Bi-weekly', value: 'bi-weekly' },
@@ -33,101 +117,140 @@ module.exports = {
 
 	async execute(interaction) {
 		const flags = config.PRIVACY['report-submit'] ? [MessageFlags.Ephemeral] : [];
+		
+		const city = interaction.options.getString('city');
+		const type = interaction.options.getString('type');
+		const notes = interaction.options.getString('notes') || '';
+		const attachmentUrl = interaction.options.getString('attachment') || null;
+
+		// If arguments are missing, present the interactive form button
+		if (!city || !type) {
+			await interaction.deferReply({ flags });
+
+			const embed = new EmbedBuilder()
+				.setTitle('Submit Fork Report')
+				.setDescription('Fill out the details of your fork report using the button below.')
+				.setColor(config.COLORS.primary)
+				.setFooter({ text: config.BRANDING.footerText });
+
+			const btn = new ButtonBuilder()
+				.setCustomId('trigger_report_modal')
+				.setLabel('Open Submission Form')
+				.setStyle(ButtonStyle.Primary);
+
+			const row = new ActionRowBuilder().addComponents(btn);
+
+			const response = await interaction.editReply({
+				embeds: [embed],
+				components: [row]
+			});
+
+			const filter = (i) => i.customId === 'trigger_report_modal' && i.user.id === interaction.user.id;
+			const collector = response.createMessageComponentCollector({ filter, time: 60000 });
+
+			collector.on('collect', async (btnInteraction) => {
+				const modal = new ModalBuilder()
+					.setCustomId('submit_report_modal')
+					.setTitle('Submit Fork Report');
+
+				const cityInput = new TextInputBuilder()
+					.setCustomId('modal_city')
+					.setLabel('Fork City')
+					.setPlaceholder('e.g. Delhi, Prayagraj')
+					.setStyle(TextInputStyle.Short)
+					.setRequired(true);
+
+				const typeInput = new TextInputBuilder()
+					.setCustomId('modal_type')
+					.setLabel('Report Type (monthly / bi-weekly)')
+					.setPlaceholder('monthly or bi-weekly')
+					.setStyle(TextInputStyle.Short)
+					.setRequired(true);
+
+				const notesInput = new TextInputBuilder()
+					.setCustomId('modal_notes')
+					.setLabel('Additional Notes')
+					.setPlaceholder('Enter report notes or details...')
+					.setStyle(TextInputStyle.Paragraph)
+					.setRequired(false);
+
+				const attachmentInput = new TextInputBuilder()
+					.setCustomId('modal_attachment')
+					.setLabel('Attachment URL (PDF, doc link)')
+					.setPlaceholder('https://...')
+					.setStyle(TextInputStyle.Short)
+					.setRequired(false);
+
+				modal.addComponents(
+					new ActionRowBuilder().addComponents(cityInput),
+					new ActionRowBuilder().addComponents(typeInput),
+					new ActionRowBuilder().addComponents(notesInput),
+					new ActionRowBuilder().addComponents(attachmentInput)
+				);
+
+				await btnInteraction.showModal(modal);
+
+				try {
+					const modalSubmit = await btnInteraction.awaitModalSubmit({
+						filter: (m) => m.customId === 'submit_report_modal' && m.user.id === interaction.user.id,
+						time: 240000
+					});
+
+					await modalSubmit.deferReply({ flags: MessageFlags.Ephemeral });
+
+					const modalCity = modalSubmit.fields.getTextInputValue('modal_city').trim();
+					const modalType = modalSubmit.fields.getTextInputValue('modal_type').trim().toLowerCase();
+					const modalNotes = modalSubmit.fields.getTextInputValue('modal_notes').trim();
+					const modalAttachment = modalSubmit.fields.getTextInputValue('modal_attachment').trim() || null;
+
+					if (modalType !== 'monthly' && modalType !== 'bi-weekly') {
+						return await modalSubmit.editReply({
+							content: 'Invalid report type. Please enter either "monthly" or "bi-weekly".'
+						});
+					}
+
+					const result = await processReportSubmission(interaction.user, modalCity, modalType, modalNotes, modalAttachment, interaction.guild);
+					
+					if (result.success) {
+						await modalSubmit.editReply({ embeds: [result.embed] });
+						
+						// Disable the trigger button
+						btn.setDisabled(true).setLabel('Form Submitted');
+						await interaction.editReply({ components: [new ActionRowBuilder().addComponents(btn)] });
+					} else {
+						if (result.embed) {
+							await modalSubmit.editReply({ embeds: [result.embed] });
+						} else {
+							await modalSubmit.editReply({ content: result.error || 'Failed to submit report.' });
+						}
+					}
+
+				} catch (modalErr) {
+					console.warn('[REPORT_MODAL_COLLECTOR] Modal timed out or failed:', modalErr.message);
+				}
+			});
+
+			return;
+		}
+
+		// Direct parameter execution
 		await interaction.deferReply({ flags });
 
 		try {
-			const city = interaction.options.getString('city');
-			const type = interaction.options.getString('type');
-			const notes = interaction.options.getString('notes') || '';
-			const attachmentUrl = interaction.options.getString('attachment') || null;
-
-			// Enforce authorization check
-			const auth = require('../lib/auth');
-			const isAuthorized = await auth.isAuthorizedForCity(interaction.user, city, interaction.guild);
-			if (!isAuthorized) {
-				const unauthorizedEmbed = new EmbedBuilder()
-					.setTitle(`${config.EMOJIS.error} PROTOCOL_UNAUTHORIZED`)
-					.setDescription(`Your credentials do not grant access to submit reports for the **${city.toUpperCase()}** node.`)
-					.setColor(config.COLORS.error)
-					.setFooter({ text: config.BRANDING.footerText });
-				return await interaction.editReply({ embeds: [unauthorizedEmbed] });
+			const result = await processReportSubmission(interaction.user, city, type, notes, attachmentUrl, interaction.guild);
+			if (result.success) {
+				await interaction.editReply({ embeds: [result.embed] });
+			} else {
+				if (result.embed) {
+					await interaction.editReply({ embeds: [result.embed] });
+				} else {
+					await interaction.editReply({ content: result.error || 'Failed to submit report.' });
+				}
 			}
-
-			// Find the fork
-			const fork = await notion.findForkByCity(city);
-			if (!fork) {
-				return await interaction.editReply({
-					content: `${config.EMOJIS.error} Fork not found: ${city}`,
-				});
-			}
-
-			// Create the report
-			await notion.createReport({
-				forkId: fork.id,
-				type: type,
-				city: city,
-				notes: notes,
-				attachmentUrl: attachmentUrl,
-				isLate: false, // Will be determined by job
-			});
-
-			// Increment reports count
-			await notion.incrementForkReports(fork.id);
-
-			// Award points for on-time report
-			try {
-				await notion.updateForkPoints(fork.id, 5);
-			} catch (e) {
-				// Points might not be set up, ignore
-			}
-
-			const embed = new EmbedBuilder()
-				.setTitle(`${config.EMOJIS.protocol} REPORT_SUBMITTED // ${city.toUpperCase()}`)
-				.setColor(config.COLORS.success)
-				.setTimestamp()
-				.setFooter({ text: config.BRANDING.footerText });
-
-			embed.addFields({
-				name: '✅ SUBMISSION_CONFIRMED',
-				value: `**Type**: ${type.charAt(0).toUpperCase() + type.slice(1)} Report\n**Submitted**: <t:${Math.floor(Date.now() / 1000)}:R>`,
-				inline: false,
-			});
-
-			if (notes) {
-				embed.addFields({
-					name: '📝 NOTES',
-					value: notes.substring(0, 1000),
-					inline: false,
-				});
-			}
-
-			if (attachmentUrl) {
-				embed.addFields({
-					name: '📎 ATTACHMENT',
-					value: `[View Attachment](${attachmentUrl})`,
-					inline: false,
-				});
-			}
-
-			embed.addFields({
-				name: '🏆 POINTS',
-				value: '+5 points awarded for report submission!',
-				inline: false,
-			});
-
-			await interaction.editReply({ embeds: [embed] });
-
 		} catch (error) {
 			console.error('[REPORT_SUBMIT_ERROR]', error);
-			
-			if (error.message.includes('NOTION_REPORTS_DB not configured')) {
-				return await interaction.editReply({
-					content: `${config.EMOJIS.error} Reports database not configured. Please set NOTION_REPORTS_DB in environment.`,
-				});
-			}
-
 			await interaction.editReply({
-				content: `${config.EMOJIS.error} SYSTEM_FAILURE: Unable to submit report.`,
+				content: 'Something went wrong while submitting the report.',
 			});
 		}
 	},
