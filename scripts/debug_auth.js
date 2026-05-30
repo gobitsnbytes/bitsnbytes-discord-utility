@@ -12,50 +12,43 @@ const client = new Client({
 
 client.once('ready', async () => {
 	try {
-		console.log('Bot is online. Debugging auth...');
+		console.log('Bot is online. Debugging auth for all active/pending forks...');
 		const guild = client.guilds.cache.get(process.env.GUILD_ID);
 		if (!guild) {
 			console.error('Guild not found:', process.env.GUILD_ID);
 			process.exit(1);
 		}
 
-		// Let's debug for Noida and its lead
-		const city = 'Noida';
-		const leadDiscordId = '1116608716473638912'; // Aryan Chauhan
-		
-		console.log(`\n--- Debugging auth for City: "${city}" and User: "${leadDiscordId}" ---`);
+		const forks = await notion.getForks();
+		console.log(`Checking ${forks.length} forks...\n`);
 
-		const fork = await notion.findForkByCity(city);
-		if (!fork) {
-			console.error(`Fork not found in Notion for city: ${city}`);
-		} else {
-			console.log('Fork found in Notion:', fork.id);
-			console.log('Notion City Name:', notion.getCityName(fork));
-			const extractedLeadId = notion.getLeadDiscordId(fork);
-			console.log('Extracted Lead Discord ID from Notion:', extractedLeadId);
-			console.log('Match with target user.id:', extractedLeadId === leadDiscordId);
+		for (const fork of forks) {
+			const city = notion.getCityName(fork);
+			const leadName = fork.properties?.["What's your name?"]?.rich_text?.[0]?.text?.content || 'Unknown';
+			const leadDiscordId = notion.getLeadDiscordId(fork);
+			const status = fork.properties?.['Status']?.select?.name || 'Unknown';
+
+			console.log(`=========================================`);
+			console.log(`City: ${city} | Lead: ${leadName} | Discord ID: ${leadDiscordId}`);
+
+			if (!leadDiscordId) {
+				console.log('❌ No Discord ID set for this lead.');
+				continue;
+			}
+
+			// Fetch member
+			const member = await guild.members.fetch(leadDiscordId).catch(err => {
+				console.log('❌ Member not found in guild:', err.message);
+				return null;
+			});
+
+			if (member) {
+				const isAuthorized = await auth.isAuthorizedForCity(member.user, city, guild);
+				console.log(`Member in Guild: ${member.user.tag}`);
+				console.log(`Roles: [${member.roles.cache.map(r => r.name).join(', ')}]`);
+				console.log(`isAuthorizedForCity: ${isAuthorized ? '✅ TRUE' : '❌ FALSE'}`);
+			}
 		}
-
-		console.log('\n--- Checking member in guild ---');
-		const member = await guild.members.fetch(leadDiscordId).catch(err => {
-			console.error('Failed to fetch guild member:', err.message);
-			return null;
-		});
-
-		if (member) {
-			console.log('Member found in guild:', member.user.tag);
-			console.log('Roles in cache:', member.roles.cache.map(r => r.name));
-			console.log('Admin:', member.permissions.has('Administrator'));
-			console.log('ManageRoles:', member.permissions.has('ManageRoles'));
-			console.log('Is Staff:', auth.isStaff(member, guild));
-		}
-
-		console.log('\n--- Running checkHierarchyAndStaff ---');
-		const mockUser = { id: leadDiscordId };
-		
-		// Run auth checks
-		const isAuthorized = await auth.isAuthorizedForCity(mockUser, city, guild);
-		console.log(`\nRESULT: isAuthorizedForCity = ${isAuthorized}`);
 
 		process.exit(0);
 	} catch (err) {
