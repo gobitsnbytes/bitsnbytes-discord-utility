@@ -187,13 +187,12 @@ module.exports = {
 						const bookingBody = {
 							eventTypeId: parseInt(calcomEventTypeId, 10),
 							start: new Date(scheduledTime).toISOString(),
-							timeZone: 'Asia/Kolkata',
-							language: 'en',
 							metadata: { discord_meeting_id: id },
 							attendee: {
 								name: interaction.user.username,
 								email: creatorEmail,
-								timeZone: 'Asia/Kolkata'
+								timeZone: 'Asia/Kolkata',
+								language: 'en'
 							},
 							...(externalEmails.length > 0 && { guests: externalEmails }),
 							...(meetingNotes && {
@@ -244,6 +243,16 @@ module.exports = {
 			
 			// Provision Voice Channel immediately for ALL voice meetings
 			const createdMeeting = await meetingsDb.getMeeting(id);
+			if (createdMeeting && calcomBookingId) {
+				try {
+					const calcom = require('../lib/calcom');
+					const locationUrl = `https://cal.gobitsnbytes.org/m/${createdMeeting.meet_code}`;
+					await calcom.updateBookingLocation(calcomBookingId, locationUrl);
+					console.log(`[MEET_SCHEDULE] Updated booking ${calcomBookingId} location to ${locationUrl}`);
+				} catch (patchErr) {
+					console.warn(`[MEET_SCHEDULE] Failed to patch booking location:`, patchErr.message);
+				}
+			}
 			if (createdMeeting && locationType === 'discord_vc') {
 				const vcChannel = await createMeetingVoiceChannel(guild, createdMeeting);
 				if (vcChannel) {

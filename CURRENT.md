@@ -92,6 +92,13 @@ View report submission status across all forks or a specific fork.
 **Options:**
 - `city` (optional): Filter by specific fork
 
+#### `/report-view`
+View the details (notes and attachments) of submitted fork reports.
+
+**Options:**
+- `city` (required): Fork city
+- `limit` (optional): Number of reports to view (default: 5)
+
 ### Automated Reminders
 
 #### `reportReminders.js`
@@ -112,6 +119,7 @@ Reports are stored in the `NOTION_REPORTS_DB` database with:
 ### Files
 - `commands/report-submit.js` - Submit reports
 - `commands/report-status.js` - View report status
+- `commands/report-view.js` - View report details
 - `jobs/reportReminders.js` - Automated reminders
 
 ---
@@ -761,4 +769,4 @@ bits-bytes-bot/
 
 ---
 
-*Last Updated: May 26, 2026*
+*Last Updated: May 30, 2026*

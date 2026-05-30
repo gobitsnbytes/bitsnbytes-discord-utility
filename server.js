@@ -1328,13 +1328,12 @@ function startWebServer(client) {
                         const bookingBody = {
                             eventTypeId: parseInt(calcomEventTypeId, 10),
                             start: new Date(startTimeMs).toISOString(),
-                            timeZone: primaryHost.timezone || 'Asia/Kolkata',
-                            language: 'en',
                             metadata: { discord_meeting_id: id },
                             attendee: {
                                 name: name,
                                 email: email.trim().toLowerCase(),
-                                timeZone: primaryHost.timezone || 'Asia/Kolkata'
+                                timeZone: primaryHost.timezone || 'Asia/Kolkata',
+                                language: 'en'
                             },
                             ...(guestEmails.length > 0 && {
                                 guests: guestEmails
@@ -1347,6 +1346,15 @@ function startWebServer(client) {
                         if (bookingResponse && (bookingResponse.uid || bookingResponse.id)) {
                             calcomBookingId = String(bookingResponse.uid || bookingResponse.id);
                             console.log(`[CALCOM] Booking created: ${calcomBookingId} (${duration}min event type ${calcomEventTypeId})`);
+                            
+                            // 2-way sync: update location to the custom meetCode URL
+                            try {
+                                const locationUrl = `https://cal.gobitsnbytes.org/m/${result.meetCode}`;
+                                await calcom.updateBookingLocation(calcomBookingId, locationUrl);
+                                console.log(`[CALCOM] Updated booking ${calcomBookingId} location to ${locationUrl}`);
+                            } catch (patchErr) {
+                                console.warn(`[CALCOM] Failed to patch booking location:`, patchErr.message);
+                            }
                         }
                     } catch (calcomErr) {
                         console.warn('[CALCOM] Web booking sync failed:', calcomErr.message);

@@ -3,6 +3,7 @@ const notion = require('../lib/notion');
 const healthScore = require('../lib/healthScore');
 const teamValidator = require('../lib/teamValidator');
 const config = require('../config');
+const auth = require('../lib/auth');
 
 // Onboarding step labels
 const ONBOARDING_STEPS = [
@@ -27,10 +28,26 @@ module.exports = {
 
 	async execute(interaction) {
 		const flags = config.PRIVACY['fork-status'] ? [MessageFlags.Ephemeral] : [];
+		
+		if (!interaction.guild) {
+			return await interaction.reply({
+				content: `${config.EMOJIS.error} This command can only be executed within a Discord server.`,
+				flags: [MessageFlags.Ephemeral]
+			});
+		}
+
 		await interaction.deferReply({ flags });
 
 		try {
 			const city = interaction.options.getString('city');
+
+			// Auth check
+			const isAuthorized = await auth.isAuthorizedForCity(interaction.user, city, interaction.guild);
+			if (!isAuthorized) {
+				return await interaction.editReply({
+					content: `${config.EMOJIS.error} You do not have permission to view the status for this fork.`,
+				});
+			}
 
 			// Find the fork
 			const fork = await notion.findForkByCity(city);

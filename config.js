@@ -77,6 +77,7 @@ module.exports = {
 		// New Phase 2 commands
 		'report-submit': true,     // Private - report submission
 		'report-status': false,    // Public - shows report status
+		'report-view': true,       // Private - view report details
 		'event-create': true,      // Private - event creation
 		'event-update': true,      // Private - event updates
 		'event-status': false,     // Public - shows event pipeline
