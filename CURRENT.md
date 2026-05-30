@@ -754,7 +754,7 @@ bits-bytes-bot/
 
 | Date | Bug | Fix |
 |------|-----|-----|
-| 2026-05-30 | Role Reaction Mismatch | Updated `lib/roles.js` to map `💻` to `tech` instead of `dev` to match the standardized track role in the Discord guild, resolving missing developer track permissions when members reacted to pick their roles. |
+| 2026-05-30 | Role Reaction Mismatch | Reverted mapping of `💻` to `dev` in `lib/roles.js` to keep the public `dev` interest role separate from the official team track `tech` role, and updated `events/messageReactionAdd.js` to automatically create interest roles (like `dev`) in the guild if they are missing. |
 | 2026-05-27 | Scoping Flaw & Category Hardening | Restricted "Open" scoped meeting VCs to the general contributor role, resolved meetings category by ID (1490416248000090122) first, and tightened the category's default permission overrides to prevent leaks to @everyone |
 | 2026-05-26 | Speaker Attribution Bug & Consent Notices | Implemented deterministic voice activity timeline tracking (start/end events) per user, coalesced adjacent segments, and updated the Gemini prompt to use the timeline as the source of truth for speaker labeling. Also updated written written channel consent notices and shortened TTS scripts. |
 | 2026-05-26 | External Guest Auto-Linkage | Added automated resolution of external guest emails to Discord IDs on OAuth callback, migrating them to attendees and granting Discord VC permissions |
