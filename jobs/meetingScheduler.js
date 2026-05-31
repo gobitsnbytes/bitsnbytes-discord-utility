@@ -139,7 +139,7 @@ module.exports = (client) => {
 							if (now - lastPing >= 5 * 60 * 1000) {
 								if (eventsChannel) {
 									await eventsChannel.send(
-										`⚠️ <@${userId}>, you are required in the meeting "**${meeting.title}**". Please join the voice channel: https://discord.com/channels/${guild.id}/${meeting.temp_channel_id}`
+										`⚠️ <@${userId}>, you are required in the meeting "**${meeting.title}**". Please join here: https://cal.gobitsnbytes.org/m/${meeting.meet_code}`
 									);
 								}
 								await meetingsDb.updateLastPingTime(meeting.id, userId);
@@ -170,7 +170,9 @@ async function sendChannelReminder(guild, meeting, timeLabel, vcLink = '') {
 		.setTimestamp()
 		.setFooter({ text: config.BRANDING.footerText });
 
-	if (vcLink) {
+	if (meeting.meet_code) {
+		embed.addFields({ name: '🔗 MEETING LINK', value: `https://cal.gobitsnbytes.org/m/${meeting.meet_code}`, inline: false });
+	} else if (vcLink) {
 		embed.addFields({ name: '🔊 JOIN VC NOW', value: `[Click here to connect](${vcLink})`, inline: false });
 	} else if (meeting.location_type === 'external') {
 		embed.addFields({ name: '🌐 LOCATION', value: meeting.location_details || 'External link', inline: false });
@@ -195,7 +197,9 @@ async function sendCommencementNotification(guild, meeting) {
 		.setTimestamp()
 		.setFooter({ text: config.BRANDING.footerText });
 
-	if (meeting.location_type === 'discord_vc' && meeting.temp_channel_id) {
+	if (meeting.meet_code) {
+		embed.addFields({ name: '🔗 MEETING LINK', value: `https://cal.gobitsnbytes.org/m/${meeting.meet_code}`, inline: false });
+	} else if (meeting.location_type === 'discord_vc' && meeting.temp_channel_id) {
 		const vcLink = `https://discord.com/channels/${guild.id}/${meeting.temp_channel_id}`;
 		embed.addFields({ name: '🔊 VOICE CHANNEL', value: `[Click to Join Channel](${vcLink})`, inline: false });
 	} else if (meeting.location_type === 'external') {

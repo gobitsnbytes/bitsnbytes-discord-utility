@@ -108,7 +108,9 @@ module.exports = {
 								.setTimestamp()
 								.setFooter({ text: config.BRANDING.footerText });
 
-							if (vcLink) {
+							if (meeting.meet_code) {
+								dmEmbed.addFields({ name: '🔗 MEETING LINK', value: `https://cal.gobitsnbytes.org/m/${meeting.meet_code}`, inline: false });
+							} else if (vcLink) {
 								dmEmbed.addFields({ name: '🔊 JOIN VOICE CHANNEL', value: `[Click here to connect](${vcLink})`, inline: false });
 							}
 

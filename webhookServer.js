@@ -186,7 +186,8 @@ async function handleBookingCreated(client, payload) {
 			.addFields(
 				{ name: '📋 TITLE', value: title, inline: false },
 				{ name: '📅 SCHEDULED TIME (IST)', value: `\`${istTimeString}\` (<t:${Math.floor(startTime / 1000)}:F>)`, inline: false },
-				{ name: '🌐 LOCATION', value: locationType === 'discord_vc' ? (vcLink ? `🔊 [Join Voice Channel](${vcLink})` : 'Discord Temporary VC') : locationDetails, inline: true },
+				{ name: '🌐 LOCATION', value: locationType === 'discord_vc' ? 'Discord Temporary VC' : 'External Location', inline: true },
+				{ name: '🔗 MEETING LINK', value: `https://cal.gobitsnbytes.org/m/${createdMeeting.meet_code}`, inline: false },
 				{ name: '👥 INVITEES', value: inviteesDisplay.join(', ') || 'None', inline: true }
 			)
 			.setColor(config.COLORS.success)
@@ -305,7 +306,8 @@ async function handleBookingRescheduled(client, payload) {
 					.addFields(
 						{ name: '📋 TITLE', value: title, inline: false },
 						{ name: '📅 NEW SCHEDULED TIME (IST)', value: `\`${newIstTimeString}\` (<t:${Math.floor(startTime / 1000)}:F>)`, inline: false },
-						{ name: '🌐 LOCATION', value: locationType === 'discord_vc' ? 'Discord Temporary VC' : locationDetails, inline: true },
+						{ name: '🌐 LOCATION', value: locationType === 'discord_vc' ? 'Discord Temporary VC' : 'External Location', inline: true },
+						{ name: '🔗 MEETING LINK', value: `https://cal.gobitsnbytes.org/m/${updatedMeeting.meet_code}`, inline: false },
 						{ name: '👥 INVITEES', value: inviteesDisplay.join(', ') || 'None', inline: true }
 					)
 					.setColor(config.COLORS.warning)

@@ -299,7 +299,8 @@ module.exports = {
 					{ name: '📋 TITLE', value: title, inline: false },
 					{ name: '📅 SCHEDULED TIME (IST)', value: `\`${istTimeString}\` (<t:${Math.floor(scheduledTime / 1000)}:F> / <t:${Math.floor(scheduledTime / 1000)}:R>)`, inline: false },
 					{ name: '⏱️ DURATION', value: `${duration} minutes`, inline: true },
-					{ name: '🌐 LOCATION', value: locationType === 'discord_vc' ? (vcLink ? `🔊 [Click to Join VC](${vcLink})` : 'Discord Temporary VC') : (locationDetails || 'External Link'), inline: true },
+					{ name: '🌐 LOCATION', value: locationType === 'discord_vc' ? 'Discord Temporary VC' : 'External Location', inline: true },
+					{ name: '🔗 MEETING LINK', value: `https://cal.gobitsnbytes.org/m/${createdMeeting.meet_code}`, inline: false },
 					{ name: '👥 INVITEES', value: displayInvitees.join(', ') || 'None', inline: false }
 				)
 				.setColor(isInstant ? config.COLORS.primary : config.COLORS.success)
