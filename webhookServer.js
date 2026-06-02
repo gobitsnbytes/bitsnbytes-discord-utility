@@ -149,6 +149,7 @@ async function handleBookingCreated(client, payload) {
 		const vcChannel = await meetingsHelper.createMeetingVoiceChannel(guild, createdMeeting);
 		if (vcChannel) {
 			createdMeeting.temp_channel_id = vcChannel.id;
+			await meetingsDb.setTempChannelId(createdMeeting.id, vcChannel.id);
 			vcLink = `https://discord.com/channels/${guild.id}/${vcChannel.id}`;
 		}
 	}

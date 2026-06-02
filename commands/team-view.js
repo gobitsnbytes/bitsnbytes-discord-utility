@@ -99,7 +99,9 @@ module.exports = {
 
 				let overviewText = '';
 
-				for (const fork of activeForks.slice(0, 10)) {
+				const activeSlice = activeForks.slice(0, 10);
+				const overviewLines = new Array(activeSlice.length);
+				const tasks = activeSlice.map((fork, idx) => async () => {
 					const forkCity = (fork.properties['What city are you in?']?.rich_text?.[0]?.text?.content || 
 					                  fork.properties['Fork Name']?.title?.[0]?.text?.content || 
 					                  'UNKNOWN').toUpperCase();
@@ -111,8 +113,11 @@ module.exports = {
 						? ` (Missing: ${validation.missingRoles.join(', ')})`
 						: '';
 
-					overviewText += `${statusEmoji} **${forkCity}**: ${validation.completeness}% complete${missingText}\n`;
-				}
+					overviewLines[idx] = `${statusEmoji} **${forkCity}**: ${validation.completeness}% complete${missingText}\n`;
+				});
+
+				await notion.limitConcurrency(tasks, 3);
+				overviewText = overviewLines.join('');
 
 				embed.addFields({
 					name: '📊 FORK_TEAMS',

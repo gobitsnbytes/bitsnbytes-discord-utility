@@ -28,14 +28,16 @@ module.exports = {
 						if (newChannel) {
 							const humanMembers = newChannel.members.filter(m => !m.user.bot);
 							if (humanMembers.size >= 2) {
-								// Transition status to active
-								await meetingsDb.updateMeetingStatus(meeting.id, 'active');
-								meeting.status = 'active';
+								// Transition status to active atomically
+								if (await meetingsDb.tryClaimReminder(meeting.id, 'commencement')) {
+									await meetingsDb.updateMeetingStatus(meeting.id, 'active');
+									meeting.status = 'active';
 
-								// Send commencement notification
-								const { sendCommencementNotification } = require('../lib/meetingsHelper');
-								await sendCommencementNotification(newState.guild, meeting);
-								console.log(`[MEETING] Meeting "${meeting.title}" (${meeting.id}) auto-commenced because 2+ human users joined the VC.`);
+									// Send commencement notification
+									const { sendCommencementNotification } = require('../lib/meetingsHelper');
+									await sendCommencementNotification(newState.guild, meeting);
+									console.log(`[MEETING] Meeting "${meeting.title}" (${meeting.id}) auto-commenced because 2+ human users joined the VC.`);
+								}
 							}
 						}
 					}

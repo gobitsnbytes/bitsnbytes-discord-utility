@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const notion = require('../lib/notion');
 const onboarding = require('../lib/onboarding');
+const meetingsDb = require('../lib/meetingsDb');
 
 module.exports = (client) => {
 	// Run daily at 10 AM
@@ -37,7 +38,10 @@ module.exports = (client) => {
 				// Only send if leadsCouncil is text-based and we have a leadId
 				if (leadsCouncil && leadsCouncil.isTextBased?.() && leadId) {
 					try {
-						await leadsCouncil.send(`hey <@${leadId}> — ${reminderMessage}`);
+						const dateKey = new Date().toISOString().split('T')[0];
+						if (await meetingsDb.tryClaimJobRun('onboardingPing', `${fork.id}-${dateKey}`)) {
+							await leadsCouncil.send(`hey <@${leadId}> — ${reminderMessage}`);
+						}
 					} catch (e) {
 						console.error(`[JOB] Failed to send onboarding reminder to ${city}:`, e.message);
 					}

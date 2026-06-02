@@ -14,7 +14,7 @@
  *   Staff     → can view + delete any meeting
  */
 
-const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const meetingsDb = require('../lib/meetingsDb');
 const { isStaff } = require('../lib/auth');
 const config = require('../config');
@@ -310,11 +310,48 @@ async function handleDelete(interaction) {
 			return interaction.editReply({ content: '📭 No transcript found for this meeting.' });
 		}
 
-		await meetingsDb.deleteTranscript(meetingId);
+		const confirmId = `confirm_delete_${meetingId}_${Date.now()}`;
+		const cancelId = `cancel_delete_${meetingId}_${Date.now()}`;
 
-		await interaction.editReply({
-			content: `🗑️ Transcript for **"${meeting.title}"** has been deleted.`,
+		const row = new ActionRowBuilder().addComponents(
+			new ButtonBuilder()
+				.setCustomId(confirmId)
+				.setLabel('Yes, delete it')
+				.setStyle(ButtonStyle.Danger),
+			new ButtonBuilder()
+				.setCustomId(cancelId)
+				.setLabel('Cancel')
+				.setStyle(ButtonStyle.Secondary)
+		);
+
+		const response = await interaction.editReply({
+			content: `⚠️ **Are you sure you want to delete the transcript for "${meeting.title}"?** This cannot be undone.`,
+			components: [row]
 		});
+
+		const filter = i => (i.customId === confirmId || i.customId === cancelId) && i.user.id === userId;
+		try {
+			const confirmation = await response.awaitMessageComponent({ filter, time: 30000 });
+			
+			if (confirmation.customId === confirmId) {
+				await meetingsDb.deleteTranscript(meetingId);
+				await confirmation.update({
+					content: `🗑️ Transcript for **"${meeting.title}"** has been deleted successfully.`,
+					components: []
+				});
+			} else {
+				await confirmation.update({
+					content: `❌ Deletion cancelled. Transcript was not deleted.`,
+					components: []
+				});
+			}
+		} catch (e) {
+			// Timeout or error
+			await interaction.editReply({
+				content: `⏱️ Deletion request timed out. No changes were made.`,
+				components: []
+			});
+		}
 	} catch (err) {
 		console.error(`[MEET-TRANSCRIPT] Error deleting transcript:`, err);
 		await interaction.editReply({ content: '❌ An error occurred while deleting the transcript.' });

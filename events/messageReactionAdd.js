@@ -1,6 +1,8 @@
 const { Events } = require('discord.js');
 const roleMap = require('../lib/roles');
 
+const rolesInProgress = new Set();
+
 module.exports = {
 	name: Events.MessageReactionAdd,
 	async execute(reaction, user) {
@@ -61,25 +63,45 @@ module.exports = {
 			if (roleName) {
 				role = reaction.message.guild.roles.cache.find(r => r.name === roleName);
 				if (!role) {
-					try {
-						role = await reaction.message.guild.roles.create({
-							name: roleName,
-							reason: `Automated creation of interest role for ${roleName}`
-						});
-					} catch (err) {
-						console.error(`[ROLES] Failed to create interest role "${roleName}":`, err.message);
+					if (rolesInProgress.has(roleName)) {
+						await new Promise(r => setTimeout(r, 1000));
+						role = reaction.message.guild.roles.cache.find(r => r.name === roleName)
+							|| await reaction.message.guild.roles.fetch().then(() => reaction.message.guild.roles.cache.find(r => r.name === roleName)).catch(() => null);
+					}
+					if (!role) {
+						rolesInProgress.add(roleName);
+						try {
+							role = await reaction.message.guild.roles.create({
+								name: roleName,
+								reason: `Automated creation of interest role for ${roleName}`
+							});
+						} catch (err) {
+							console.error(`[ROLES] Failed to create interest role "${roleName}":`, err.message);
+						} finally {
+							rolesInProgress.delete(roleName);
+						}
 					}
 				}
 			} else if (matchedCity) {
 				role = reaction.message.guild.roles.cache.find(r => r.name.toLowerCase() === matchedCity.toLowerCase());
 				if (!role) {
-					try {
-						role = await reaction.message.guild.roles.create({
-							name: matchedCity,
-							reason: `Automated creation of community city role for ${matchedCity}`
-						});
-					} catch (err) {
-						console.error(`[ROLES] Failed to create community city role "${matchedCity}":`, err.message);
+					if (rolesInProgress.has(matchedCity.toLowerCase())) {
+						await new Promise(r => setTimeout(r, 1000));
+						role = reaction.message.guild.roles.cache.find(r => r.name.toLowerCase() === matchedCity.toLowerCase())
+							|| await reaction.message.guild.roles.fetch().then(() => reaction.message.guild.roles.cache.find(r => r.name.toLowerCase() === matchedCity.toLowerCase())).catch(() => null);
+					}
+					if (!role) {
+						rolesInProgress.add(matchedCity.toLowerCase());
+						try {
+							role = await reaction.message.guild.roles.create({
+								name: matchedCity,
+								reason: `Automated creation of community city role for ${matchedCity}`
+							});
+						} catch (err) {
+							console.error(`[ROLES] Failed to create community city role "${matchedCity}":`, err.message);
+						} finally {
+							rolesInProgress.delete(matchedCity.toLowerCase());
+						}
 					}
 				}
 			}

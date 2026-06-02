@@ -2,6 +2,8 @@ const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js'
 const notion = require('../lib/notion');
 const events = require('../lib/events');
 const config = require('../config');
+const auth = require('../lib/auth');
+const calcom = require('../lib/calcom');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -58,7 +60,6 @@ module.exports = {
 			const expectedAttendees = interaction.options.getInteger('expected-attendees') || 0;
 
 			// Enforce authorization check
-			const auth = require('../lib/auth');
 			const isAuthorized = await auth.isAuthorizedForCity(interaction.user, city, interaction.guild);
 			if (!isAuthorized) {
 				const unauthorizedEmbed = new EmbedBuilder()
@@ -85,6 +86,23 @@ module.exports = {
 				});
 			}
 
+			// Prevent duplicate events
+			try {
+				const existingEvents = await notion.getEvents(fork.id);
+				const hasDuplicate = existingEvents.some(e => 
+					e.title.trim().toLowerCase() === title.trim().toLowerCase() && 
+					e.date === dateStr &&
+					e.status !== 'Cancelled'
+				);
+				if (hasDuplicate) {
+					return await interaction.editReply({
+						content: `${config.EMOJIS.error} An event with the same title ("${title}") on the same date (${dateStr}) has already been proposed for ${city}.`,
+					});
+				}
+			} catch (err) {
+				console.warn(`[EVENT_CREATE] Failed to check for duplicate events:`, err.message);
+			}
+
 			// Create the event
 			const event = await notion.createEvent({
 				title,
@@ -100,7 +118,6 @@ module.exports = {
 			let calcomBookingId = null;
 			if (process.env.CALCOM_API_KEY && process.env.CALCOM_EVENT_TYPE_30) {
 				try {
-					const calcom = require('../lib/calcom');
 					const bookingResponse = await calcom.createBooking({
 						eventTypeId: parseInt(process.env.CALCOM_EVENT_TYPE_30, 10),
 						start: new Date(`${dateStr}T10:00:00+05:30`).toISOString(),

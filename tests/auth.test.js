@@ -6,15 +6,19 @@ const { isAuthorizedForCity, isAuthorizedForForkId } = require('../lib/auth');
 const notion = require('../lib/notion');
 
 // Mock notion module
-jest.mock('../lib/notion', () => ({
-	findForkByCity: jest.fn(),
-	findTeamMember: jest.fn(),
-	getLeadDiscordId: jest.fn().mockImplementation(fork => fork?.properties?.['Discord ID']?.rich_text?.[0]?.text?.content || null),
-	getCityName: jest.fn().mockImplementation(fork => fork?.properties?.['What city are you in?']?.rich_text?.[0]?.text?.content || fork?.properties?.City?.rich_text?.[0]?.text?.content || null),
-	pages: {
-		retrieve: jest.fn(),
-	},
-}));
+jest.mock('../lib/notion', () => {
+	const pagesRetrieve = jest.fn();
+	return {
+		findForkByCity: jest.fn(),
+		findTeamMember: jest.fn(),
+		getLeadDiscordId: jest.fn().mockImplementation(fork => fork?.properties?.['Discord ID']?.rich_text?.[0]?.text?.content || null),
+		getCityName: jest.fn().mockImplementation(fork => fork?.properties?.['What city are you in?']?.rich_text?.[0]?.text?.content || fork?.properties?.City?.rich_text?.[0]?.text?.content || null),
+		pages: {
+			retrieve: pagesRetrieve,
+		},
+		retrievePage: jest.fn().mockImplementation(async (pageId) => pagesRetrieve({ page_id: pageId })),
+	};
+});
 
 describe('Auth Layer Tests', () => {
 	let mockUser;

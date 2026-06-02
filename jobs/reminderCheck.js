@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const notion = require('../lib/notion');
 const healthScore = require('../lib/healthScore');
 const smartReminders = require('../lib/smartReminders');
+const meetingsDb = require('../lib/meetingsDb');
 const { EmbedBuilder } = require('discord.js');
 
 // Notion-persisted reminder store with a 30-day cooldown
@@ -22,11 +23,18 @@ const reminderStore = {
 };
 
 module.exports = (client) => {
-	// Run daily at 9 AM
-	cron.schedule('0 9 * * *', async () => {
+	// Run daily at 9:05 AM (staggered from reportReminders)
+	cron.schedule('5 9 * * *', async () => {
 		console.log('[JOB] Running Daily Reminder Check...');
 		
 		try {
+			const now = new Date();
+			const dateKey = now.toISOString().split('T')[0];
+			if (!(await meetingsDb.tryClaimJobRun('reminderCheck', dateKey))) {
+				console.log('[REMINDER_CHECK] Already ran for today. Skipping.');
+				return;
+			}
+
 			const forks = await notion.getForks();
 			const activeForks = forks.filter(f => f.properties?.Status?.select?.name === 'Active');
 			const guild = client.guilds.cache.first();

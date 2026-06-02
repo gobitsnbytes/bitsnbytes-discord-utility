@@ -11,17 +11,7 @@ module.exports = {
 			option
 				.setName('city')
 				.setDescription('View specific fork health')
-				.setRequired(false))
-		.addStringOption(option =>
-			option
-				.setName('period')
-				.setDescription('Time period for the leaderboard')
-				.setRequired(false)
-				.addChoices(
-					{ name: 'Week', value: 'week' },
-					{ name: 'Month', value: 'month' },
-					{ name: 'All Time', value: 'all-time' },
-				)),
+				.setRequired(false)),
 
 	async execute(interaction) {
 		const flags = config.PRIVACY['fork-health'] ? [MessageFlags.Ephemeral] : [];
@@ -29,7 +19,6 @@ module.exports = {
 
 		try {
 			const city = interaction.options.getString('city');
-			const period = interaction.options.getString('period') || 'all-time';
 
 			// If specific city requested
 			if (city) {
@@ -95,7 +84,7 @@ module.exports = {
 			}
 
 			const embed = new EmbedBuilder()
-				.setTitle(`🏆 HEALTH_LEADERBOARD // ${period.toUpperCase()}`)
+				.setTitle('🏆 HEALTH_LEADERBOARD // NETWORK_HEALTH')
 				.setColor(config.COLORS.primary)
 				.setTimestamp()
 				.setFooter({ text: config.BRANDING.footerText });

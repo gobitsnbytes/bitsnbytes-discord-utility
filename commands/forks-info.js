@@ -128,10 +128,10 @@ module.exports = {
 				.filter(isValidFork)
 				.filter(f => f.properties?.Status?.select?.name === 'Pending');
 
-			// Get team members counts and pre-fetch lead names
+			// Get team members counts and pre-fetch lead names with concurrency limiting (max 3 req/s)
 			const activeStats = {};
 			const leadNames = {};
-			for (const f of active) {
+			const tasks = active.map(f => async () => {
 				try {
 					const team = await notion.getTeamMembers(f.id);
 					activeStats[f.id] = team.length;
@@ -148,7 +148,8 @@ module.exports = {
 						leadNames[leadId] = f.properties?.["What's your name?"]?.rich_text?.[0]?.text?.content;
 					}
 				}
-			}
+			});
+			await notion.limitConcurrency(tasks, 3);
 
 			const embed = buildEmbed(active, pending, activeStats, Date.now(), interaction.guild, leadNames);
 			const buttons = buildButtons();
@@ -232,7 +233,7 @@ module.exports = {
 
 			const activeStats = {};
 			const leadNames = {};
-			for (const f of active) {
+			const tasks = active.map(f => async () => {
 				try {
 					const team = await notion.getTeamMembers(f.id);
 					activeStats[f.id] = team.length;
@@ -249,7 +250,8 @@ module.exports = {
 						leadNames[leadId] = f.properties?.["What's your name?"]?.rich_text?.[0]?.text?.content;
 					}
 				}
-			}
+			});
+			await notion.limitConcurrency(tasks, 3);
 
 			const embed = buildEmbed(active, pending, activeStats, Date.now(), interaction.guild, leadNames);
 			const buttons = buildButtons();

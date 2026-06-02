@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js'
 const meetingsDb = require('../lib/meetingsDb');
 const config = require('../config');
 const { sendCommencementNotification, resolveAttendeeUserIds } = require('../lib/meetingsHelper');
+const { isStaff, getForkLeadRole } = require('../lib/auth');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -14,7 +15,6 @@ module.exports = {
 				.setAutocomplete(true)),
 
 	async execute(interaction) {
-		const { isStaff, getForkLeadRole } = require('../lib/auth');
 		const member = await interaction.guild.members.fetch(interaction.user.id);
 		
 		const staffCheck = isStaff(member, interaction.guild);

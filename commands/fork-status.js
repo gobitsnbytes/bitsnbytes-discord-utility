@@ -63,14 +63,16 @@ module.exports = {
 			// Gather all data
 			const health = healthScore.calculateHealthScore(fork);
 			const healthStatus = healthScore.getHealthStatus(health.score);
-			const teamMembers = await notion.getTeamMembers(forkId);
+			const [teamMembers, events, reports, onboardingStatus, badges] = await notion.limitConcurrency([
+				() => notion.getTeamMembers(forkId),
+				() => notion.getEvents(forkId),
+				() => notion.getReports(forkId),
+				() => notion.getOnboardingStatus(forkId),
+				() => notion.getForkBadges(forkId)
+			], 3);
 			const teamValidation = teamValidator.validateTeam(teamMembers);
-			const events = await notion.getEvents(forkId);
 			const upcomingEvents = events.filter(e => new Date(e.date) >= new Date());
 			const completedEvents = events.filter(e => e.status === 'Completed');
-			const reports = await notion.getReports(forkId);
-			const onboardingStatus = await notion.getOnboardingStatus(forkId);
-			const badges = await notion.getForkBadges(forkId);
 
 			// Lead info
 			const leadId = props['Discord ID']?.rich_text?.[0]?.text?.content;

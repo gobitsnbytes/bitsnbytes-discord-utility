@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const notion = require('../lib/notion');
 const gamification = require('../lib/gamification');
 const healthScore = require('../lib/healthScore');
+const meetingsDb = require('../lib/meetingsDb');
 const { EmbedBuilder } = require('discord.js');
 
 module.exports = (client) => {
@@ -10,6 +11,13 @@ module.exports = (client) => {
 		console.log('[JOB] Running Monthly Winner Selection...');
 		
 		try {
+			const now = new Date();
+			const periodKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
+			if (!(await meetingsDb.tryClaimJobRun('monthlyWinner', periodKey))) {
+				console.log('[MONTHLY_WINNER] Already ran for this period. Skipping.');
+				return;
+			}
+
 			const forks = await notion.getForks();
 			const activeForks = forks.filter(f => f.properties?.Status?.select?.name === 'Active');
 			const guild = client.guilds.cache.first();
@@ -20,13 +28,12 @@ module.exports = (client) => {
 
 			// Calculate monthly points for each fork
 			const forkScores = [];
-			const now = new Date();
 			const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 			const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 			// Use exclusive upper bound (start of current month) to include entire last month
 			const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-			for (const fork of activeForks) {
+			const tasks = activeForks.map(fork => async () => {
 				const city = fork.properties['What city are you in?']?.rich_text?.[0]?.text?.content || 
 				             fork.properties['Fork Name']?.title?.[0]?.text?.content || 
 				             'UNKNOWN';
@@ -69,7 +76,9 @@ module.exports = (client) => {
 					reportsCount: reportsLastMonth,
 					eventsCount: eventsCompletedLastMonth,
 				});
-			}
+			});
+
+			await notion.limitConcurrency(tasks, 3);
 
 			// Sort by monthly score
 			forkScores.sort((a, b) => b.monthlyScore - a.monthlyScore);

@@ -21,17 +21,8 @@ module.exports = (client) => {
 			const currentMonth = now.getMonth();
 			const currentDay = now.getDate();
 
-			// Calculate monthly deadline: last day of previous month for reports due last month
-			// For current month reports, deadline is last day of current month
-			const lastDayOfCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-			
-			// Bi-weekly deadlines: 15th and last day of month
-			const biweeklyDeadline1 = 15;
-			const biweeklyDeadline2 = lastDayOfCurrentMonth;
-
 			let updatedCount = 0;
-
-			for (const fork of activeForks) {
+			const tasks = activeForks.map(fork => async () => {
 				const reports = await notion.getReports(fork.id);
 				
 				// Only check reports marked as 'on-time'
@@ -123,7 +114,9 @@ module.exports = (client) => {
 						}
 					}
 				}
-			}
+			});
+
+			await notion.limitConcurrency(tasks, 3);
 
 			console.log(`[JOB] Report Late Updater completed. Updated ${updatedCount} reports.`);
 

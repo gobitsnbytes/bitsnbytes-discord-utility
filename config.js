@@ -46,8 +46,21 @@ module.exports = {
 
 	// 📄 PROTOCOL BRANDING
 	BRANDING: {
+		version: '2.0.0',
 		footerText: 'BITS&BYTES // SECURE_PROTOCOL_V2.0.0',
 		documentationLabel: 'Bits&Bytes Wiki →',
+	},
+
+	// 🧬 CORE SERVER ROLE CONFIGURATIONS
+	ROLE_IDS: {
+		contributor: process.env.CONTRIBUTOR_ROLE_ID || '1506019068132462804',
+	},
+
+	// 🧬 CORE SERVER CHANNEL CONFIGURATIONS
+	CHANNEL_IDS: {
+		announcement: process.env.ANNOUNCEMENT_CHANNEL_ID || '1490415427409412376',
+		events: process.env.EVENTS_CHANNEL_ID || '1508037242092912650',
+		teamChat: process.env.TEAM_CHAT_CHANNEL_ID || '1490417184172806285',
 	},
 
 	// 🖥️ SYSTEM INTERFACE SETTINGS
@@ -70,6 +83,11 @@ module.exports = {
 		merge: true,
 		'fork-request': true,
 		'view-forks': false,
+		// Missing command privacy keys
+		assets: true,
+		ping: true,
+		'forks-info': false,
+		'admin-add-lead': true,
 		// New Phase 1 commands
 		'fork-health': false,      // Public - shows network health
 		'team-update': true,       // Private - team management

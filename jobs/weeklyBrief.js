@@ -3,6 +3,19 @@ const { EmbedBuilder } = require('discord.js');
 const notion = require('../lib/notion');
 const config = require('../config');
 const logger = require('../lib/logger');
+const meetingsDb = require('../lib/meetingsDb');
+
+function getISOWeek(date) {
+	const tempDate = new Date(date.valueOf());
+	const dayNum = (date.getDay() + 6) % 7;
+	tempDate.setDate(tempDate.getDate() - dayNum + 3);
+	const firstThursday = tempDate.valueOf();
+	tempDate.setMonth(0, 1);
+	if (tempDate.getDay() !== 4) {
+		tempDate.setMonth(0, 1 + ((4 - tempDate.getDay() + 7) % 7));
+	}
+	return 1 + Math.ceil((firstThursday - tempDate) / 604800000);
+}
 
 module.exports = (client) => {
 	// Run every Monday at 09:00 (0 9 * * 1)
@@ -10,6 +23,13 @@ module.exports = (client) => {
 		logger.info('Initializing Weekly Network Intelligence Brief...');
 		
 		try {
+			const now = new Date();
+			const periodKey = `week-${now.getFullYear()}-${getISOWeek(now)}`;
+			if (!(await meetingsDb.tryClaimJobRun('weeklyBrief', periodKey))) {
+				logger.info('[WEEKLY_BRIEF] Already ran for this period. Skipping.');
+				return;
+			}
+
 			const forks = await notion.getForks();
 			const teamChatId = '1490417184172806285';
 			const channel = await client.channels.fetch(teamChatId);

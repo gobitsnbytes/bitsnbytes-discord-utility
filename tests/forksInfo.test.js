@@ -13,6 +13,7 @@ jest.mock('../lib/notion', () => ({
 	getForks: jest.fn(),
 	getLeadDiscordId: jest.fn(),
 	getTeamMembers: jest.fn(),
+	limitConcurrency: jest.fn().mockImplementation(async (tasks) => Promise.all(tasks.map(t => t()))),
 }));
 
 // Mock auth

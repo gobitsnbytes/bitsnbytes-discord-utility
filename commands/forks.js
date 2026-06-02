@@ -8,10 +8,10 @@ module.exports = {
 		.setDescription('View technical topology of the Bits&Bytes network.'),
 
 	async execute(interaction) {
-		const allowedRoles = ['1506019068132462804', '1506323726223016149', '1480620981587279993'];
+		const { isStaff } = require('../lib/auth');
 		const member = await interaction.guild.members.fetch(interaction.user.id);
 		
-		const isAuthorized = allowedRoles.some(roleId => member.roles.cache.has(roleId)) || member.permissions.has('Administrator');
+		const isAuthorized = member.roles.cache.has(config.ROLE_IDS.contributor) || isStaff(member, interaction.guild) || member.permissions.has('Administrator');
 		
 		if (!isAuthorized) {
 			const unauthorizedEmbed = new EmbedBuilder()

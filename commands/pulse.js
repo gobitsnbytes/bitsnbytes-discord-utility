@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const notion = require('../lib/notion');
 const config = require('../config');
+const auth = require('../lib/auth');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -19,7 +20,6 @@ module.exports = {
 
 		try {
 			// Enforce authorization check for the city node
-			const auth = require('../lib/auth');
 			const isAuthorized = await auth.isAuthorizedForCity(interaction.user, city, guild);
 			if (!isAuthorized) {
 				const unauthorizedEmbed = new EmbedBuilder()

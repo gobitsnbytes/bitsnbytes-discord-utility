@@ -1,11 +1,11 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, MessageFlags } = require('discord.js');
 const notion = require('../lib/notion');
 const config = require('../config');
+const auth = require('../lib/auth');
 
 // Shared execution logic to process report submission
 async function processReportSubmission(user, city, type, notes, attachmentUrl, guild) {
 	// Enforce authorization check
-	const auth = require('../lib/auth');
 	const isAuthorized = await auth.isAuthorizedForCity(user, city, guild);
 	if (!isAuthorized) {
 		return {
@@ -25,6 +25,46 @@ async function processReportSubmission(user, city, type, notes, attachmentUrl, g
 			success: false,
 			error: `Fork not found: ${city}`
 		};
+	}
+
+	// Prevent duplicate reports within the same period
+	try {
+		const reports = await notion.getReports(fork.id).catch(() => []);
+		const now = new Date();
+		const currentMonth = now.getMonth();
+		const currentYear = now.getFullYear();
+		const currentDay = now.getDate();
+
+		if (type === 'monthly') {
+			const hasMonthly = reports.some(r => {
+				if (r.type !== 'monthly') return false;
+				const submitted = new Date(r.submittedDate);
+				return submitted.getMonth() === currentMonth && submitted.getFullYear() === currentYear;
+			});
+			if (hasMonthly) {
+				return {
+					success: false,
+					error: `A monthly report for ${city} has already been submitted this month.`
+				};
+			}
+		} else if (type === 'bi-weekly') {
+			const isFirstHalf = currentDay <= 15;
+			const hasBiweekly = reports.some(r => {
+				if (r.type !== 'bi-weekly') return false;
+				const submitted = new Date(r.submittedDate);
+				if (submitted.getMonth() !== currentMonth || submitted.getFullYear() !== currentYear) return false;
+				const day = submitted.getDate();
+				return isFirstHalf ? (day >= 1 && day <= 15) : (day >= 16);
+			});
+			if (hasBiweekly) {
+				return {
+					success: false,
+					error: `A bi-weekly report (for the ${isFirstHalf ? 'first' : 'second'} half of this month) has already been submitted for ${city}.`
+				};
+			}
+		}
+	} catch (err) {
+		console.warn(`[REPORT_SUBMIT] Failed to perform duplicate report check:`, err.message);
 	}
 
 	// Create the report in Notion

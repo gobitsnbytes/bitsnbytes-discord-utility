@@ -43,20 +43,6 @@ module.exports = {
 				const leadId = fork.properties['Discord ID']?.rich_text?.[0]?.text?.content;
 				const health = healthScore.calculateHealthScore(fork);
 
-				// Get activities
-				const reports = await notion.getReports(fork.id);
-				const events = await notion.getEvents(fork.id);
-
-				const now = new Date();
-				const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-				const startOfYear = new Date(now.getFullYear(), 0, 1);
-
-				// Calculate monthly activities
-				const reportsThisMonth = reports.filter(r => new Date(r.submittedDate) >= startOfMonth);
-				const eventsCompletedThisMonth = events.filter(e => 
-					e.status === 'Completed' && new Date(e.date) >= startOfMonth
-				).length;
-
 				// Get stored points - use persisted Monthly Points as single source of truth
 				const storedPoints = fork.properties.Points?.number || 0;
 				const persistedMonthlyPoints = fork.properties['Monthly Points']?.number || 0;

@@ -3,6 +3,8 @@ const notion = require('../lib/notion');
 const events = require('../lib/events');
 const gamification = require('../lib/gamification');
 const config = require('../config');
+const auth = require('../lib/auth');
+const calcom = require('../lib/calcom');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -57,7 +59,6 @@ module.exports = {
 			}
 
 			// Enforce authorization check using the event's forkId
-			const auth = require('../lib/auth');
 			const isAuthorized = await auth.isAuthorizedForForkId(interaction.user, event.forkId, interaction.guild);
 			if (!isAuthorized) {
 				const unauthorizedEmbed = new EmbedBuilder()
@@ -96,7 +97,6 @@ module.exports = {
 			// Sync Cal.com: cancel booking if event is cancelled
 			if (status === 'Cancelled' && event.calcomBookingId && process.env.CALCOM_API_KEY) {
 				try {
-					const calcom = require('../lib/calcom');
 					await calcom.cancelBooking(
 						event.calcomBookingId,
 						`Event cancelled via Discord by ${interaction.user.username}`

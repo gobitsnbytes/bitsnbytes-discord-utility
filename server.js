@@ -23,6 +23,59 @@ const REDIRECT_URI = process.env.REDIRECT_URI || `http://localhost:${PORT}/auth/
 // Session store: session_id -> user details
 const sessions = new Map();
 
+// Periodic cleanup of expired sessions from Map to prevent memory leaks
+setInterval(async () => {
+    try {
+        const expiredIds = await db.all(
+            `SELECT id FROM web_sessions WHERE expires_at < ?`, [Date.now()]
+        );
+        for (const { id } of expiredIds) {
+            sessions.delete(id);
+        }
+    } catch (err) {
+        console.error('[SESSIONS_CLEANUP] Failed to cleanup expired sessions:', err.message);
+    }
+}, 60 * 60 * 1000); // hourly
+
+// Simple in-memory rate limiter helper
+const rateLimit = (options) => {
+    const hits = new Map();
+    const windowMs = options.windowMs || 60 * 1000;
+    const max = options.max || 100;
+    const message = options.message || 'Too many requests, please try again later.';
+
+    setInterval(() => {
+        const now = Date.now();
+        for (const [ip, timestamps] of hits) {
+            const active = timestamps.filter(t => now - t < windowMs);
+            if (active.length === 0) {
+                hits.delete(ip);
+            } else {
+                hits.set(ip, active);
+            }
+        }
+    }, windowMs);
+
+    return (req, res, next) => {
+        const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const now = Date.now();
+        const timestamps = hits.get(ip) || [];
+        const activeTimestamps = timestamps.filter(t => now - t < windowMs);
+        
+        if (activeTimestamps.length >= max) {
+            return res.status(429).json({ error: message });
+        }
+        
+        activeTimestamps.push(now);
+        hits.set(ip, activeTimestamps);
+        next();
+    };
+};
+
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many authentication attempts. Please try again later.' });
+const bookLimiter = rateLimit({ windowMs: 1 * 60 * 1000, max: 5, message: 'Too many booking attempts. Please try again later.' });
+const instantLimiter = rateLimit({ windowMs: 1 * 60 * 1000, max: 5, message: 'Too many meeting requests. Please try again later.' });
+
 // Active cities cache
 let activeCitiesCache = null;
 let activeCitiesCacheTimestamp = 0;
@@ -64,7 +117,9 @@ function getTimezoneOffsetString(timeZone, date = new Date()) {
             return '+00:00';
         }
     } catch (e) {
-        console.error(`[TIMEZONE] Failed to calculate offset for ${timeZone}:`, e.message);
+        if (process.env.NODE_ENV !== 'test') {
+            console.warn(`[TIMEZONE] Failed to calculate offset for ${timeZone}:`, e.message);
+        }
     }
     return '+05:30'; // Default fallback
 }
@@ -88,7 +143,7 @@ function startWebServer(client) {
                 next();
             });
         } else {
-            express.json()(req, res, next);
+            express.json({ limit: '100kb' })(req, res, next);
         }
     });
 
@@ -165,7 +220,7 @@ function startWebServer(client) {
         res.redirect(discordAuthUrl);
     });
 
-    app.get('/auth/callback', async (req, res) => {
+    app.get('/auth/callback', authLimiter, async (req, res) => {
         const { code, state } = req.query;
         const cookieState = req.cookies.oauth_state;
 
@@ -324,11 +379,12 @@ function startWebServer(client) {
             if (userData.email) {
                 try {
                     const userEmail = userData.email.trim().toLowerCase();
+                    const escapedEmail = userEmail.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
                     const pendingMeetings = await db.all(
                         `SELECT id, temp_channel_id, external_emails FROM meetings 
                          WHERE status != 'cancelled' 
-                           AND external_emails LIKE '%' || ? || '%'`,
-                        [userEmail]
+                           AND external_emails LIKE '%' || ? || '%' ESCAPE '\\'`,
+                        [escapedEmail]
                     );
 
                     for (const meet of pendingMeetings) {
@@ -377,8 +433,9 @@ function startWebServer(client) {
             }
 
             // Retrieve return destination
-            const returnTo = req.cookies.auth_return_to || '/dashboard';
+            const rawReturnTo = req.cookies.auth_return_to || '/dashboard';
             res.clearCookie('auth_return_to');
+            const returnTo = (rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//') && !rawReturnTo.startsWith('/\\')) ? rawReturnTo : '/dashboard';
 
             // Set cookie
             res.cookie('session_id', sessionId, { 
@@ -1313,7 +1370,7 @@ function startWebServer(client) {
     });
 
     // API: Create instant meeting
-    app.post('/api/instant-meeting', checkAuth, async (req, res) => {
+    app.post('/api/instant-meeting', checkAuth, instantLimiter, async (req, res) => {
         try {
             const { title, description, scope, city } = req.body;
             if (!title) {
@@ -1378,6 +1435,7 @@ function startWebServer(client) {
                 const vcChannel = await meetingsHelper.createMeetingVoiceChannel(guild, createdMeeting);
                 if (vcChannel) {
                     createdMeeting.temp_channel_id = vcChannel.id;
+                    await meetingsDb.setTempChannelId(createdMeeting.id, vcChannel.id);
                 }
 
                 // Announce in events channel
@@ -1501,7 +1559,7 @@ function startWebServer(client) {
         }
     });
 
-    app.post('/api/book/:bookingLink', checkAuth, async (req, res) => {
+    app.post('/api/book/:bookingLink', checkAuth, bookLimiter, async (req, res) => {
         const { bookingLink } = req.params;
         const { date, slot, name, email, guests, title, description, notes, duration, additionalHosts, inviteWholeFork, instant, scope } = req.body;
 
@@ -1636,7 +1694,7 @@ function startWebServer(client) {
             };
 
             // Write the hold lock meeting record to database immediately to block concurrent bookings!
-            await meetingsDb.createMeeting(newMeeting);
+            const result = await meetingsDb.createMeeting(newMeeting);
             
             // Add all hosts as attendees
             for (const host of allHosts) {
@@ -1822,6 +1880,7 @@ function startWebServer(client) {
                         const vcChannel = await meetingsHelper.createMeetingVoiceChannel(guild, createdMeeting);
                         if (vcChannel) {
                             createdMeeting.temp_channel_id = vcChannel.id;
+                            await meetingsDb.setTempChannelId(createdMeeting.id, vcChannel.id);
                         }
                         
                         const eventsChannel = await getEventsChannel(guild);
@@ -1981,6 +2040,7 @@ function startWebServer(client) {
                         const vcChannel = await meetingsHelper.createMeetingVoiceChannel(guild, createdMeeting);
                         if (vcChannel) {
                             createdMeeting.temp_channel_id = vcChannel.id;
+                            await meetingsDb.setTempChannelId(createdMeeting.id, vcChannel.id);
                         }
                     }
                     await meetingsHelper.sendMeetingEmails(guild, createdMeeting, 'invite');

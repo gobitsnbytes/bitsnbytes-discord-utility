@@ -79,7 +79,7 @@ module.exports = {
 				const activeForks = forks.filter(f => f.properties?.Status?.select?.name === 'Active');
 
 				const forkStatuses = [];
-				for (const fork of activeForks) {
+				const tasks = activeForks.map(fork => async () => {
 					const status = await notion.getOnboardingStatus(fork.id);
 					if (!onboarding.isOnboardingComplete(status)) {
 						const city = fork.properties['What city are you in?']?.rich_text?.[0]?.text?.content || 
@@ -91,7 +91,8 @@ module.exports = {
 							leadId: fork.properties['Discord ID']?.rich_text?.[0]?.text?.content,
 						});
 					}
-				}
+				});
+				await notion.limitConcurrency(tasks, 3);
 
 				if (forkStatuses.length === 0) {
 					return await interaction.editReply({

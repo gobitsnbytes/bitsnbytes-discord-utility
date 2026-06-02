@@ -58,18 +58,18 @@ module.exports = {
 			});
 		}
 
-		// Stop recording silently (preventing console logs and webhook logs)
-		const recordingData = await stopRecording(targetSession.meetingId, { silent: true });
+		// Stop recording silently (preventing console logs and webhook logs) and purge
+		try {
+			const recordingData = await stopRecording(targetSession.meetingId, { silent: true });
 
-		// Purge the temporary audio directory
-		if (recordingData && recordingData.meetingDir) {
-			try {
+			// Purge the temporary audio directory
+			if (recordingData && recordingData.meetingDir) {
 				if (fs.existsSync(recordingData.meetingDir)) {
 					fs.rmSync(recordingData.meetingDir, { recursive: true, force: true });
 				}
-			} catch (err) {
-				// Suppressed: do not log to server console
 			}
+		} catch (err) {
+			// Suppressed: do not log to server console
 		}
 
 		// Reply ephemerally and schedule deletion of the reply to leave no trace in chat

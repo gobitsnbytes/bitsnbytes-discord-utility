@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const notion = require('../lib/notion');
+const meetingsDb = require('../lib/meetingsDb');
 
 module.exports = (client) => {
 	// Run daily at 9 AM
@@ -82,33 +83,47 @@ module.exports = (client) => {
 			});
 			const monthlyReportSubmitted = thisMonthMonthlyReports.length > 0;
 
+			const dateKey = now.toISOString().split('T')[0];
+
 			// 48 hours before monthly deadline
 			if (daysUntilMonthly === 2 && !monthlyReportSubmitted) {
-				await leadsCouncil.send(`📋 <@${leadId}> — Monthly report for ${city} is due in 48 hours. Submit via \`/report-submit\` to stay on track!`);
+				if (await meetingsDb.tryClaimJobRun('reportReminder', `${fork.id}-monthly-48h-${dateKey}`)) {
+					await leadsCouncil.send(`📋 <@${leadId}> — Monthly report for ${city} is due in 48 hours. Submit via \`/report-submit\` to stay on track!`);
+				}
 			}
 
 			// Monthly deadline missed (check on 1st of new month if last month's report wasn't submitted)
 			if (currentDay === 1 && !previousMonthSubmitted) {
-				await leadsCouncil.send(`⚠️ <@${leadId}> — Monthly report for ${city} is overdue. Please submit immediately to avoid health score impact.`);
+				if (await meetingsDb.tryClaimJobRun('reportReminder', `${fork.id}-monthly-overdue-${dateKey}`)) {
+					await leadsCouncil.send(`⚠️ <@${leadId}> — Monthly report for ${city} is overdue. Please submit immediately to avoid health score impact.`);
+				}
 			}
 
 			// Bi-weekly deadline missed (check day after bi-weekly due dates)
 			// First half overdue: check on 16th if first half bi-weekly wasn't submitted
 			if (currentDay === 16 && !firstHalfSubmitted) {
-				await leadsCouncil.send(`⚠️ <@${leadId}> — Bi-weekly report (first half) for ${city} is overdue. Please submit immediately!`);
+				if (await meetingsDb.tryClaimJobRun('reportReminder', `${fork.id}-biweekly-1-overdue-${dateKey}`)) {
+					await leadsCouncil.send(`⚠️ <@${leadId}> — Bi-weekly report (first half) for ${city} is overdue. Please submit immediately!`);
+				}
 			}
 			// Second half overdue: check on 1st if second half bi-weekly wasn't submitted
 			if (currentDay === 1 && !secondHalfSubmitted) {
-				await leadsCouncil.send(`⚠️ <@${leadId}> — Bi-weekly report (second half) for ${city} is overdue. Please submit immediately!`);
+				if (await meetingsDb.tryClaimJobRun('reportReminder', `${fork.id}-biweekly-2-overdue-${dateKey}`)) {
+					await leadsCouncil.send(`⚠️ <@${leadId}> — Bi-weekly report (second half) for ${city} is overdue. Please submit immediately!`);
+				}
 			}
 
-				// 48 hours before bi-weekly deadline
-				if (daysUntilBiweekly1 === 2 && !firstHalfSubmitted) {
+			// 48 hours before bi-weekly deadline
+			if (daysUntilBiweekly1 === 2 && !firstHalfSubmitted) {
+				if (await meetingsDb.tryClaimJobRun('reportReminder', `${fork.id}-biweekly-1-48h-${dateKey}`)) {
 					await leadsCouncil.send(`📋 <@${leadId}> — Bi-weekly report for ${city} is due in 48 hours. Submit via \`/report-submit\`!`);
 				}
-				if (daysUntilBiweekly2 === 2 && !secondHalfSubmitted) {
+			}
+			if (daysUntilBiweekly2 === 2 && !secondHalfSubmitted) {
+				if (await meetingsDb.tryClaimJobRun('reportReminder', `${fork.id}-biweekly-2-48h-${dateKey}`)) {
 					await leadsCouncil.send(`📋 <@${leadId}> — Bi-weekly report for ${city} is due in 48 hours. Submit via \`/report-submit\`!`);
 				}
+			}
 			}
 
 			console.log('[JOB] Report Reminders Check completed');

@@ -2,15 +2,16 @@ const cron = require('node-cron');
 const { ChannelType, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const meetingsDb = require('../lib/meetingsDb');
 const config = require('../config');
-const { resolveAttendeeUserIds, createMeetingVoiceChannel, sendMeetingDMs } = require('../lib/meetingsHelper');
-
-const { getEventsChannel } = require('../lib/calcomWebhook');
+const meetingsHelper = require('../lib/meetingsHelper');
+const { resolveAttendeeUserIds, createMeetingVoiceChannel, sendMeetingDMs, sendMeetingEmails } = meetingsHelper;
+const { getEventsChannel, syncCalcomBookings } = require('../lib/calcomWebhook');
+const { stopRecording } = require('../lib/voiceRecorder');
+const { queueTranscription } = require('../lib/transcriptionPipeline');
 
 module.exports = (client) => {
 	// Run Cal.com sync every 2 minutes
 	cron.schedule('*/2 * * * *', async () => {
 		try {
-			const { syncCalcomBookings } = require('../lib/calcomWebhook');
 			await syncCalcomBookings(client);
 		} catch (error) {
 			console.error('[MEETING SCHEDULER] Cal.com sync job error:', error);
@@ -32,30 +33,23 @@ module.exports = (client) => {
 
 				// Case 1: 12 Hours Remaining
 				if (timeDiff <= 12 * 60 * 60 * 1000 && timeDiff > 11.5 * 60 * 60 * 1000) {
-					const sent = await meetingsDb.hasReminderBeenSent(meeting.id, '12h');
-					if (!sent) {
+					if (await meetingsDb.tryClaimReminder(meeting.id, '12h')) {
 						await sendChannelReminder(guild, meeting, '12 hours');
-						const meetingsHelper = require('../lib/meetingsHelper');
-						await meetingsHelper.sendMeetingEmails(guild, meeting, 'reminder', '12 hours');
-						await meetingsDb.recordReminderSent(meeting.id, '12h');
+						await sendMeetingEmails(guild, meeting, 'reminder', '12 hours');
 					}
 				}
 
 				// Case 2: 30 Minutes Remaining
 				if (timeDiff <= 30 * 60 * 1000 && timeDiff > 25 * 60 * 1000) {
-					const sent = await meetingsDb.hasReminderBeenSent(meeting.id, '30m');
-					if (!sent) {
+					if (await meetingsDb.tryClaimReminder(meeting.id, '30m')) {
 						await sendChannelReminder(guild, meeting, '30 minutes');
-						const meetingsHelper = require('../lib/meetingsHelper');
-						await meetingsHelper.sendMeetingEmails(guild, meeting, 'reminder', '30 minutes');
-						await meetingsDb.recordReminderSent(meeting.id, '30m');
+						await sendMeetingEmails(guild, meeting, 'reminder', '30 minutes');
 					}
 				}
 
 				// Case 3: 5 Minutes Remaining (VC Creation & Notification)
 				if (timeDiff <= 5 * 60 * 1000 && timeDiff > 0) {
-					const sent = await meetingsDb.hasReminderBeenSent(meeting.id, '5m');
-					if (!sent) {
+					if (await meetingsDb.tryClaimReminder(meeting.id, '5m')) {
 						let vcLink = '';
 						
 						if (meeting.location_type === 'discord_vc') {
@@ -67,19 +61,20 @@ module.exports = (client) => {
 
 						await sendChannelReminder(guild, meeting, '5 minutes', vcLink);
 						await sendMeetingDMs(guild, meeting, vcLink);
-						await meetingsDb.recordReminderSent(meeting.id, '5m');
 					}
 				}
 
 				// Case 4: Meeting Commencement Time
 				if (now >= meeting.scheduled_time) {
-					if (meeting.location_type === 'discord_vc') {
-						await meetingsDb.updateMeetingStatus(meeting.id, 'active');
-						await sendCommencementNotification(guild, meeting);
-					} else {
-						// For external location, automatically mark complete
-						await meetingsDb.updateMeetingStatus(meeting.id, 'completed');
-						await sendCommencementNotification(guild, meeting);
+					if (await meetingsDb.tryClaimReminder(meeting.id, 'commencement')) {
+						if (meeting.location_type === 'discord_vc') {
+							await meetingsDb.updateMeetingStatus(meeting.id, 'active');
+							await sendCommencementNotification(guild, meeting);
+						} else {
+							// For external location, automatically mark complete
+							await meetingsDb.updateMeetingStatus(meeting.id, 'completed');
+							await sendCommencementNotification(guild, meeting);
+						}
 					}
 				}
 			}
@@ -107,6 +102,23 @@ module.exports = (client) => {
 					const durationActive = now - meeting.scheduled_time;
 					if (durationActive > 30 * 60 * 1000 && vcChannel.members.filter(m => !m.user.bot).size === 0) {
 						console.log(`[MEETING] VC empty for over 30 mins. Cleaning up meeting "${meeting.title}"...`);
+
+						// Stop recording and queue transcription BEFORE deleting the channel
+						// (mirrors the same flow in voiceStateUpdate.js to prevent transcript loss)
+						if (process.env.RECORDING_ENABLED === 'true') {
+							try {
+								const recordingData = await stopRecording(meeting.id);
+								if (recordingData) {
+									console.log(`[MEETING] Queuing transcription for stale-cleaned meeting "${meeting.title}" (${meeting.id})`);
+									queueTranscription(meeting, recordingData, client).catch(err => {
+										console.error(`[MEETING] Transcription pipeline error for ${meeting.id}:`, err);
+									});
+								}
+							} catch (recErr) {
+								console.error(`[MEETING] Error stopping recording during stale cleanup for ${meeting.id}:`, recErr);
+							}
+						}
+
 						await vcChannel.delete('Stale meeting VC deleted.').catch(() => {});
 						await meetingsDb.updateMeetingStatus(meeting.id, 'completed');
 						continue;

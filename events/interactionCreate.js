@@ -105,6 +105,11 @@ module.exports = {
 						return await interaction.followUp({ content: `❌ Meeting request is already processed (Status: ${meeting.status}).`, flags: [MessageFlags.Ephemeral] });
 					}
 
+					// Atomic: only one button click wins across processes
+					if (!(await meetingsDb.tryClaimReminder(meetingId, 'instant_processed'))) {
+						return await interaction.followUp({ content: '❌ Meeting request is already processed.', flags: [MessageFlags.Ephemeral] });
+					}
+
 					// Update status to active
 					await meetingsDb.updateMeetingStatus(meetingId, 'active');
 
@@ -201,6 +206,11 @@ module.exports = {
 					}
 					if (meeting.status !== 'pending') {
 						return await interaction.followUp({ content: `❌ Meeting request is already processed (Status: ${meeting.status}).`, flags: [MessageFlags.Ephemeral] });
+					}
+
+					// Atomic: only one button click wins across processes
+					if (!(await meetingsDb.tryClaimReminder(meetingId, 'instant_processed'))) {
+						return await interaction.followUp({ content: '❌ Meeting request is already processed.', flags: [MessageFlags.Ephemeral] });
 					}
 
 					// Update status to cancelled

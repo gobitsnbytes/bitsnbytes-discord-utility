@@ -2,6 +2,10 @@ const { SlashCommandBuilder, ChannelType, PermissionFlagsBits, EmbedBuilder, Act
 const notion = require('../lib/notion');
 const meetingsDb = require('../lib/meetingsDb');
 const config = require('../config');
+const { isStaff, getStaffRole, getForkLeadRole } = require('../lib/auth');
+const { setupOnboardingRoles, setupOnboardingChannel } = require('../lib/onboardingHelper');
+const { syncForkPermissions } = require('../lib/channelSync');
+const logger = require('../lib/logger');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -11,7 +15,6 @@ module.exports = {
 		.addStringOption(option => option.setName('city').setDescription('The city for the fork').setRequired(true)),
 
 	async execute(interaction) {
-		const { isStaff, getStaffRole, getForkLeadRole } = require('../lib/auth');
 		const executingMember = await interaction.guild.members.fetch(interaction.user.id);
 		
 		const isAuthorized = isStaff(executingMember, interaction.guild);
@@ -37,79 +40,10 @@ module.exports = {
 		await interaction.deferReply({ flags });
 
 		try {
-			// 1. Assign @fork-lead role
-			const forkLeadRole = getForkLeadRole(guild);
-			if (!forkLeadRole) throw new Error('@fork-lead role not found in server.');
-			
 			const member = await guild.members.fetch(user.id);
-			let roleAssigned = true;
-			try {
-				await member.roles.add(forkLeadRole);
-			} catch (roleErr) {
-				console.error('[ADMIN_ADD_LEAD] Failed to assign role (hierarchy/permissions check):', roleErr.message);
-				roleAssigned = false;
-			}
-
-			// Resolve or create contributor role
-			let contributorRole = guild.roles.cache.get('1506019068132462804') || guild.roles.cache.find(r => r.name.toLowerCase() === 'contributor');
-			if (!contributorRole) {
-				try {
-					contributorRole = await guild.roles.create({
-						name: 'contributor',
-						reason: 'Direct onboard general contributor role creation'
-					});
-				} catch (err) {
-					console.error('[ADMIN_ADD_LEAD] Failed to create contributor role:', err.message);
-				}
-			}
-			if (contributorRole) {
-				try {
-					await member.roles.add(contributorRole);
-				} catch (roleErr) {
-					console.error('[ADMIN_ADD_LEAD] Failed to assign contributor role:', roleErr.message);
-				}
-			}
-
-			// Resolve or create contributor city role
-			let contributorCityRole = guild.roles.cache.find(r => r.name.toLowerCase() === `contributor-${city.toLowerCase()}`);
-			if (!contributorCityRole) {
-				try {
-					contributorCityRole = await guild.roles.create({
-						name: `contributor-${city}`,
-						reason: 'Direct onboard contributor city role creation'
-					});
-				} catch (err) {
-					console.error(`[ADMIN_ADD_LEAD] Failed to create contributor city role "contributor-${city}":`, err.message);
-				}
-			}
-			if (contributorCityRole) {
-				try {
-					await member.roles.add(contributorCityRole);
-				} catch (roleErr) {
-					console.error(`[ADMIN_ADD_LEAD] Failed to assign contributor city role (${city}):`, roleErr.message);
-					roleAssigned = false;
-				}
-			}
-
-			// Resolve or create city role
-			let cityRole = guild.roles.cache.find(r => r.name.toLowerCase() === city.toLowerCase());
-			if (!cityRole) {
-				try {
-					cityRole = await guild.roles.create({
-						name: city,
-						reason: 'Direct onboard city role creation'
-					});
-				} catch (err) {
-					console.error(`[ADMIN_ADD_LEAD] Failed to create city role "${city}":`, err.message);
-				}
-			}
-			if (cityRole) {
-				try {
-					await member.roles.add(cityRole);
-				} catch (roleErr) {
-					console.error(`[ADMIN_ADD_LEAD] Failed to assign city role (${city}):`, roleErr.message);
-				}
-			}
+			
+			// 1. Assign roles using onboarding helper
+			const { roleAssigned, contributorCityRole } = await setupOnboardingRoles(guild, member, city);
 
 			// 2. Check Notion database
 			const fork = await notion.findForkByCity(city);
@@ -137,68 +71,8 @@ module.exports = {
 				}
 			}
 
-			// 3. Create/Setup City Channel
-			const category = guild.channels.cache.find(c => c.name === 'FORKS' && c.type === ChannelType.GuildCategory);
-			const channelName = `gobitsnbytes-${city.toLowerCase().replace(/\s+/g, '-')}`;
-			
-			const overwrites = [
-				{ id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] }
-			];
-
-			if (contributorCityRole) {
-				overwrites.push({
-					id: contributorCityRole.id,
-					allow: [
-						PermissionFlagsBits.ViewChannel,
-						PermissionFlagsBits.SendMessages,
-						PermissionFlagsBits.EmbedLinks,
-						PermissionFlagsBits.AttachFiles,
-						PermissionFlagsBits.ReadMessageHistory
-					]
-				});
-			}
-
-			overwrites.push({
-				id: user.id,
-				allow: [
-					PermissionFlagsBits.ViewChannel,
-					PermissionFlagsBits.SendMessages,
-					PermissionFlagsBits.EmbedLinks,
-					PermissionFlagsBits.AttachFiles,
-					PermissionFlagsBits.ReadMessageHistory,
-					PermissionFlagsBits.ManageMessages,
-					PermissionFlagsBits.ManageChannels,
-					PermissionFlagsBits.ManageWebhooks
-				]
-			});
-
-			const staffRole = getStaffRole(guild);
-			if (staffRole) {
-				overwrites.push({
-					id: staffRole.id,
-					allow: [
-						PermissionFlagsBits.ViewChannel,
-						PermissionFlagsBits.SendMessages,
-						PermissionFlagsBits.EmbedLinks,
-						PermissionFlagsBits.AttachFiles,
-						PermissionFlagsBits.ReadMessageHistory,
-						PermissionFlagsBits.ManageMessages,
-						PermissionFlagsBits.ManageWebhooks
-					]
-				});
-			}
-
-			let channel = guild.channels.cache.find(c => c.name === channelName);
-			if (!channel) {
-				channel = await guild.channels.create({
-					name: channelName,
-					type: ChannelType.GuildText,
-					parent: category ? category.id : null,
-					permissionOverwrites: overwrites
-				});
-			} else {
-				await channel.permissionOverwrites.set(overwrites);
-			}
+			// 3. Create/Setup City Channel using onboarding helper
+			const { channel, channelName } = await setupOnboardingChannel(guild, user, city, contributorCityRole);
 
 			const successEmbed = new EmbedBuilder()
 				.setTitle(`${config.EMOJIS.protocol} ADMIN_FORCE_MERGE // DIRECT_ONBOARD`)
@@ -233,7 +107,6 @@ module.exports = {
 
 			// 4. Trigger self-healing permissions sync immediately
 			try {
-				const { syncForkPermissions } = require('../lib/channelSync');
 				const updatedFork = await notion.findForkByCity(city);
 				if (updatedFork) {
 					await syncForkPermissions(guild.client, updatedFork);
@@ -244,7 +117,6 @@ module.exports = {
 
 		} catch (error) {
 			console.error('[ADMIN_ADD_LEAD_ERROR]', error);
-			const logger = require('../lib/logger');
 			logger.error('Failed to force-onboard fork lead', error);
 			await interaction.editReply(`❌ There was an error while force-onboarding the fork lead: **${error.message}**`);
 		}

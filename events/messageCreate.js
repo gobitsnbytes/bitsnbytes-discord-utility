@@ -3,12 +3,24 @@ const { Events, EmbedBuilder } = require('discord.js');
 const inviteRegex = /(discord\.(gg|io|me|li)\/.+|discordapp\.com\/invite\/.+)/i;
 const userMessageCounts = new Map();
 
+// Periodic cleanup to avoid memory leaks
+setInterval(() => {
+	const now = Date.now();
+	for (const [id, stats] of userMessageCounts) {
+		if (now - stats.timestamp > 60000) {
+			userMessageCounts.delete(id);
+		}
+	}
+}, 60000);
+
 module.exports = {
 	name: Events.MessageCreate,
 	async execute(message) {
 		if (message.author.bot) return;
 
 		const guild = message.guild;
+		if (!guild) return;
+
 		const opsChannel = guild.channels.cache.find(c => c.name === 'team-ops');
 
 		// 1. Block external Discord invite links
