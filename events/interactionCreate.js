@@ -252,6 +252,84 @@ module.exports = {
 					console.error('[BUTTON_DECLINE_ERROR]', err);
 					await interaction.followUp({ content: '❌ System failure while declining meeting.', flags: [MessageFlags.Ephemeral] }).catch(() => null);
 				}
+			} else if (interaction.customId.startsWith('action_item_complete_') || interaction.customId.startsWith('action_item_dismiss_')) {
+				const isComplete = interaction.customId.startsWith('action_item_complete_');
+				const actionItemId = interaction.customId.replace('action_item_complete_', '').replace('action_item_dismiss_', '');
+				try {
+					await interaction.deferUpdate();
+					const meetingsDb = require('../lib/meetingsDb');
+					const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+
+					const actionItem = await meetingsDb.getActionItem(actionItemId);
+					if (!actionItem) {
+						return await interaction.followUp({ content: '❌ Action item not found.', flags: [MessageFlags.Ephemeral] });
+					}
+
+					// Verify authorization (only the assigned user can update it)
+					if (actionItem.discord_id && interaction.user.id !== actionItem.discord_id) {
+						return await interaction.followUp({ content: '❌ You are not authorized to update this action item.', flags: [MessageFlags.Ephemeral] });
+					}
+
+					const newStatus = isComplete ? 'completed' : 'dismissed';
+					await meetingsDb.updateActionItemStatus(actionItemId, newStatus);
+
+					// Get original embed
+					const originalEmbed = interaction.message.embeds[0];
+					if (!originalEmbed) {
+						return await interaction.followUp({ content: '❌ Original message content is missing.', flags: [MessageFlags.Ephemeral] });
+					}
+
+					const updatedEmbed = EmbedBuilder.from(originalEmbed);
+					
+					let completedRow;
+					if (isComplete) {
+						updatedEmbed
+							.setTitle(`✅ ACTION_ITEM_COMPLETED`)
+							.setColor(config.COLORS.success)
+							.setDescription(originalEmbed.description + `\n\n**Status:** Completed`);
+						
+						completedRow = new ActionRowBuilder().addComponents(
+							new ButtonBuilder()
+								.setCustomId(`action_item_complete_${actionItemId}`)
+								.setLabel('Completed')
+								.setStyle(ButtonStyle.Success)
+								.setDisabled(true)
+								.setEmoji('🟢'),
+							new ButtonBuilder()
+								.setCustomId(`action_item_dismiss_${actionItemId}`)
+								.setLabel('Dismiss')
+								.setStyle(ButtonStyle.Secondary)
+								.setDisabled(true)
+						);
+					} else {
+						updatedEmbed
+							.setTitle(`❌ ACTION_ITEM_DISMISSED`)
+							.setColor(config.COLORS.error)
+							.setDescription(originalEmbed.description + `\n\n**Status:** Dismissed`);
+						
+						completedRow = new ActionRowBuilder().addComponents(
+							new ButtonBuilder()
+								.setCustomId(`action_item_complete_${actionItemId}`)
+								.setLabel('Mark Completed')
+								.setStyle(ButtonStyle.Success)
+								.setDisabled(true),
+							new ButtonBuilder()
+								.setCustomId(`action_item_dismiss_${actionItemId}`)
+								.setLabel('Dismissed')
+								.setStyle(ButtonStyle.Secondary)
+								.setDisabled(true)
+								.setEmoji('🔴')
+						);
+					}
+
+					await interaction.editReply({
+						embeds: [updatedEmbed],
+						components: [completedRow]
+					}).catch(() => {});
+				} catch (err) {
+					console.error('[ACTION_ITEM_BUTTON_ERROR]', err);
+					await interaction.followUp({ content: '❌ System failure while updating action item.', flags: [MessageFlags.Ephemeral] }).catch(() => null);
+				}
 			}
 		}
 	},

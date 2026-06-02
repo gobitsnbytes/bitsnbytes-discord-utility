@@ -1,6 +1,6 @@
 /**
  * 🛰️ BITS&BYTES PROTOCOL - ELITE CONFIGURATION ENGINE
- * Version: 2.0.0 (Tactical Overhaul)
+ * Version: 2.1.0 (Tactical Overhaul)
  */
 
 module.exports = {
@@ -46,8 +46,8 @@ module.exports = {
 
 	// 📄 PROTOCOL BRANDING
 	BRANDING: {
-		version: '2.0.0',
-		footerText: 'BITS&BYTES // SECURE_PROTOCOL_V2.0.0',
+		version: '2.1.0',
+		footerText: 'BITS&BYTES // SECURE_PROTOCOL_V2.1.0',
 		documentationLabel: 'Bits&Bytes Wiki →',
 	},
 

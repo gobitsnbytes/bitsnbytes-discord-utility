@@ -1,6 +1,6 @@
 {
   "name": "dc-bot",
-  "version": "1.1.0",
+  "version": "2.1.0",
   "description": "BnB Bot — The internal operations layer for the Bits&Bytes Discord server.",
   "main": "index.js",
   "scripts": {
