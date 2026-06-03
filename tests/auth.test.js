@@ -77,12 +77,13 @@ describe('Auth Layer Tests', () => {
 			expect(mockGuild.members.fetch).toHaveBeenCalledWith('user_123');
 		});
 
-		test('should authorize users with ManageRoles permissions', async () => {
+		test('should not authorize users with ManageRoles permissions unless they are lead/staff', async () => {
 			mockMember.permissions.has.mockImplementation((perm) => perm === 'ManageRoles');
+			notion.findForkByCity.mockResolvedValue(null);
 			
 			const result = await isAuthorizedForCity(mockUser, 'Delhi', mockGuild);
 			
-			expect(result).toBe(true);
+			expect(result).toBe(false);
 		});
 
 		test('should authorize users with Administrator permissions', async () => {
@@ -180,6 +181,7 @@ describe('Auth Layer Tests', () => {
 		test('should deny access if fork-lead role is missing from guild', async () => {
 			mockGuild.roles.cache.find.mockReturnValue(null);
 			mockGuild.roles.cache.get.mockReturnValue(null);
+			notion.findForkByCity.mockResolvedValue(null);
 
 			const result = await isAuthorizedForCity(mockUser, 'Delhi', mockGuild);
 			expect(result).toBe(false);

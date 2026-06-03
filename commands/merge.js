@@ -77,7 +77,7 @@ module.exports = {
 
 			// Announce new fork to announcements channel
 			try {
-				const announcementChannel = await guild.channels.fetch('1490415427409412376');
+				const announcementChannel = await guild.channels.fetch(config.CHANNEL_IDS.announcement || '1490415427409412376');
 				if (announcementChannel) {
 					const capitalizedCity = city.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
 					await announcementChannel.send(`**Bits&Bytes ${capitalizedCity}** is now live! Led by <@${user.id}>`);

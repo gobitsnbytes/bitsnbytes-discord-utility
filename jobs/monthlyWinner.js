@@ -29,7 +29,6 @@ module.exports = (client) => {
 			// Calculate monthly points for each fork
 			const forkScores = [];
 			const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-			const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 			// Use exclusive upper bound (start of current month) to include entire last month
 			const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -47,12 +46,12 @@ module.exports = (client) => {
 				// Use exclusive upper bound (< endOfLastMonth instead of <=)
 				const reportsLastMonth = reports.filter(r => {
 					const submitted = new Date(r.submittedDate);
-					return submitted >= startOfLastMonth && submitted < endOfLastMonth;
+					return submitted >= lastMonth && submitted < endOfLastMonth;
 				}).length;
 
 				const eventsCompletedLastMonth = events.filter(e => {
 					const eventDate = new Date(e.date);
-					return e.status === 'Completed' && eventDate >= startOfLastMonth && eventDate < endOfLastMonth;
+					return e.status === 'Completed' && eventDate >= lastMonth && eventDate < endOfLastMonth;
 				}).length;
 
 				// Calculate monthly score

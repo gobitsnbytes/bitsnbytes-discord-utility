@@ -35,9 +35,11 @@ module.exports = (client) => {
 				const lastPulse = fork.properties['Last Pulse']?.date?.start;
 				const leadId = fork.properties['Discord ID']?.rich_text?.[0]?.text?.content;
 
-				if (!lastPulse || !leadId) continue;
+				if (!leadId) continue;
+				const pulseDateStr = lastPulse || fork.created_time;
+				if (!pulseDateStr) continue;
 
-				const pulseDate = new Date(lastPulse);
+				const pulseDate = new Date(pulseDateStr);
 				const diffInDays = Math.floor((now - pulseDate) / (1000 * 60 * 60 * 24));
 
 				if (diffInDays >= 90) {

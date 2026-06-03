@@ -3,7 +3,7 @@ const { ChannelType, PermissionFlagsBits, EmbedBuilder } = require('discord.js')
 const meetingsDb = require('../lib/meetingsDb');
 const config = require('../config');
 const meetingsHelper = require('../lib/meetingsHelper');
-const { resolveAttendeeUserIds, createMeetingVoiceChannel, sendMeetingDMs, sendMeetingEmails } = meetingsHelper;
+const { resolveAttendeeUserIds, createMeetingVoiceChannel, sendMeetingDMs, sendMeetingEmails, sendCommencementNotification } = meetingsHelper;
 const { getEventsChannel, syncCalcomBookings } = require('../lib/calcomWebhook');
 const { stopRecording } = require('../lib/voiceRecorder');
 const { queueTranscription } = require('../lib/transcriptionPipeline');
@@ -99,7 +99,8 @@ module.exports = (client) => {
 					}
 
 					// Stale cleanup: if VC has been empty for > 30 minutes after start time
-					const durationActive = now - meeting.scheduled_time;
+					const startTime = meeting.activated_at || meeting.scheduled_time;
+					const durationActive = now - startTime;
 					if (durationActive > 30 * 60 * 1000 && vcChannel.members.filter(m => !m.user.bot).size === 0) {
 						console.log(`[MEETING] VC empty for over 30 mins. Cleaning up meeting "${meeting.title}"...`);
 
@@ -196,30 +197,4 @@ async function sendChannelReminder(guild, meeting, timeLabel, vcLink = '') {
 	});
 }
 
-async function sendCommencementNotification(guild, meeting) {
-	const eventsChannel = await getEventsChannel(guild);
-	if (!eventsChannel) return;
 
-	const tags = (meeting.attendees || []).map(a => a.type === 'user' ? `<@${a.discordId}>` : `<@&${a.discordId}>`).join(' ');
-
-	const embed = new EmbedBuilder()
-		.setTitle(`⚛️ MEETING_COMMENCEMENT // LIVE`)
-		.setDescription("The meeting \"**" + meeting.title + "**\" is starting now!")
-		.setColor(config.COLORS.primary)
-		.setTimestamp()
-		.setFooter({ text: config.BRANDING.footerText });
-
-	if (meeting.meet_code) {
-		embed.addFields({ name: '🔗 MEETING LINK', value: `https://cal.gobitsnbytes.org/m/${meeting.meet_code}`, inline: false });
-	} else if (meeting.location_type === 'discord_vc' && meeting.temp_channel_id) {
-		const vcLink = `https://discord.com/channels/${guild.id}/${meeting.temp_channel_id}`;
-		embed.addFields({ name: '🔊 VOICE CHANNEL', value: `[Click to Join Channel](${vcLink})`, inline: false });
-	} else if (meeting.location_type === 'external') {
-		embed.addFields({ name: '🌐 LOCATION', value: meeting.location_details || 'External link', inline: false });
-	}
-
-	await eventsChannel.send({
-		content: `🚨 **Meeting starting now**: ${tags}`,
-		embeds: [embed]
-	});
-}

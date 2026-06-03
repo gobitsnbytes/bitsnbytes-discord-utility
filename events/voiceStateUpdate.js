@@ -107,7 +107,8 @@ module.exports = {
 							// AND we are past a 5-minute grace period from the scheduled start time.
 							// Otherwise, keep the VC open for attendees to join/rejoin.
 							if (meeting.status === 'active') {
-								const timeSinceStart = Date.now() - meeting.scheduled_time;
+								const startTime = meeting.activated_at || meeting.scheduled_time;
+								const timeSinceStart = Date.now() - startTime;
 								if (timeSinceStart < 5 * 60 * 1000) {
 									console.log(`[MEETING] Temporary VC ${channel.name} (${oldChannelId}) is empty, but within 5-minute grace period. Keeping VC open.`);
 									return;

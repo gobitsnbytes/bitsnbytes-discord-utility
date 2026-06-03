@@ -93,7 +93,8 @@ client.once('ready', async () => {
 
 		// Log Deployment Receipt
 		const gitInfo = getGitInfo();
-		const stats = `✅ Commands: ${client.commands.size} Loaded\n✅ Events: Hooked\n✅ Jobs: Active`;
+		const jobStatus = global.jobsLoadSuccess !== false ? '✅ Jobs: Active' : '⚠️ Jobs: Load Failures';
+		const stats = `✅ Commands: ${client.commands.size} Loaded\n✅ Events: Hooked\n${jobStatus}`;
 		
 		if (gitInfo.available) {
 			logger.boot(
@@ -211,6 +212,8 @@ logger.boot('Initializing jobs...', null, false);
  * @param {Object} client - Discord client
  * @param {string} jobName - Human-readable job name for logging
  */
+global.jobsLoadSuccess = true;
+
 function safeStartJob(jobPath, client, jobName) {
 	try {
 		const job = require(jobPath);
@@ -218,6 +221,7 @@ function safeStartJob(jobPath, client, jobName) {
 		logger.boot(`${jobName} initialized successfully.`, null, false);
 	} catch (err) {
 		logger.error(`Failed to initialize ${jobName}`, err);
+		global.jobsLoadSuccess = false;
 	}
 }
 

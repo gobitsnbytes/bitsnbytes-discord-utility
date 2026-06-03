@@ -180,6 +180,33 @@ function startWebServer(client) {
         res.status(401).json({ error: 'Unauthorized' });
     }
 
+    // Auth verification helper middleware for pages (redirects instead of returning JSON)
+    async function checkPageAuth(req, res, next) {
+        const sessionId = req.cookies.session_id;
+        if (sessionId) {
+            if (sessions.has(sessionId)) {
+                req.user = sessions.get(sessionId);
+                return next();
+            }
+            try {
+                const session = await db.get(`SELECT * FROM web_sessions WHERE id = ? AND expires_at > ?`, [sessionId, Date.now()]);
+                if (session) {
+                    const userDetails = {
+                        id: session.user_id,
+                        username: session.username,
+                        email: session.email
+                    };
+                    sessions.set(sessionId, userDetails);
+                    req.user = userDetails;
+                    return next();
+                }
+            } catch (err) {
+                console.error('[PAGE_AUTH_ERROR] Session check failed:', err);
+            }
+        }
+        res.redirect('/');
+    }
+
     // ============================================
     // DISCORD OAUTH2 ROUTES
     // ============================================
@@ -469,39 +496,15 @@ function startWebServer(client) {
         res.redirect('/');
     });
 
-    app.get('/dashboard', async (req, res) => {
-        const sessionId = req.cookies.session_id;
-        if (sessionId) {
-            let userId = null;
-            if (sessions.has(sessionId)) {
-                userId = sessions.get(sessionId).id;
-            } else {
-                try {
-                    const session = await db.get(`SELECT * FROM web_sessions WHERE id = ? AND expires_at > ?`, [sessionId, Date.now()]);
-                    if (session) {
-                        userId = session.user_id;
-                        sessions.set(sessionId, {
-                            id: session.user_id,
-                            username: session.username,
-                            email: session.email
-                        });
-                    }
-                } catch (err) {
-                    console.error('[DASHBOARD_ERROR] Session check failed:', err);
-                }
-            }
-
-            if (userId) {
-                // Verify user holds contributor role (by checking user_availability presence)
-                const isHost = await db.get(`SELECT 1 FROM user_availability WHERE discord_id = ?`, [userId]);
-                if (isHost) {
-                    return res.sendFile(path.join(__dirname, 'public/dashboard.html'));
-                } else {
-                    return res.status(403).send('Access Denied: You must be a member of the Bits&Bytes Discord server and hold the "contributor" role to view the dashboard.');
-                }
-            }
+    app.get('/dashboard', checkPageAuth, async (req, res) => {
+        const userId = req.user.id;
+        // Verify user holds contributor role (by checking user_availability presence)
+        const isHost = await db.get(`SELECT 1 FROM user_availability WHERE discord_id = ?`, [userId]);
+        if (isHost) {
+            return res.sendFile(path.join(__dirname, 'public/dashboard.html'));
+        } else {
+            return res.status(403).send('Access Denied: You must be a member of the Bits&Bytes Discord server and hold the "contributor" role to view the dashboard.');
         }
-        res.redirect('/');
     });
 
     // ============================================
@@ -689,7 +692,7 @@ function startWebServer(client) {
         }
     });
 
-    app.get('/api/users', async (req, res) => {
+    app.get('/api/users', checkAuth, async (req, res) => {
         try {
             const users = await db.all(`SELECT discord_id, username, title, booking_link, description, timezone, weekly_hours, calcom_event_type_id, associated_role_id, avatar FROM user_availability WHERE booking_link IS NOT NULL`);
             const resolvedUsers = await Promise.all(users.map(async (u) => {
@@ -708,7 +711,7 @@ function startWebServer(client) {
     });
 
     // Returns the list of active fork city slugs for the scope selector UI
-    app.get('/api/forks', async (req, res) => {
+    app.get('/api/forks', checkAuth, async (req, res) => {
         try {
             const notion = require('./lib/notion');
             const forks = await notion.getForks();
@@ -728,7 +731,7 @@ function startWebServer(client) {
     });
 
     // Returns status of the multi-bot listener pool (total configured, busy, available)
-    app.get('/api/listeners/status', (req, res) => {
+    app.get('/api/listeners/status', checkAuth, (req, res) => {
         try {
             const listenerManager = require('./lib/listenerManager');
             res.json(listenerManager.getListenerStatus());
@@ -1091,9 +1094,9 @@ function startWebServer(client) {
 
             const wasActive = meeting.status === 'active';
 
-            // Update status to completed (aligning with Cal.com cancellation behavior)
-            await meetingsDb.updateMeetingStatus(meeting.id, 'completed');
-            meeting.status = 'completed';
+            // Update status to cancelled
+            await meetingsDb.updateMeetingStatus(meeting.id, 'cancelled');
+            meeting.status = 'cancelled';
 
             // If it was active, stop recording
             if (wasActive) {
@@ -1201,9 +1204,12 @@ function startWebServer(client) {
 
                 // Check if they are already in the database email preferences, else fetch / sync email
                 if (guild) {
-                    const member = await guild.members.fetch(targetDiscordId).catch(() => null);
-                    if (member && member.user.email) {
-                        await meetingsDb.setUserEmail(targetDiscordId, member.user.email).catch(() => {});
+                    let userEmail = await db.get(`SELECT email FROM user_availability WHERE discord_id = ? AND email IS NOT NULL`, [targetDiscordId]);
+                    if (!userEmail) {
+                        userEmail = await db.get(`SELECT email FROM meeting_email_preferences WHERE discord_id = ?`, [targetDiscordId]);
+                    }
+                    if (userEmail && userEmail.email) {
+                        await meetingsDb.setUserEmail(targetDiscordId, userEmail.email).catch(() => {});
                     }
                 }
 
@@ -1479,7 +1485,7 @@ function startWebServer(client) {
     // API: Get current user's meetings
     app.get('/api/my-meetings', checkAuth, async (req, res) => {
         try {
-            const meetings = await meetingsDb.getActiveMeetingsByCreator(req.user.id);
+            const meetings = await meetingsDb.getActiveMeetingsForUser(req.user.id);
             res.json(meetings);
         } catch (err) {
             console.error('[MY_MEETINGS_ERROR]', err);
@@ -2094,7 +2100,7 @@ function startWebServer(client) {
 
 async function runUserCleanup(client) {
     try {
-        const targetGuildId = '1480617556292272260';
+        const targetGuildId = process.env.GUILD_ID || '1480617556292272260';
         const guild = client.guilds.cache.get(targetGuildId) || await client.guilds.fetch(targetGuildId).catch(() => null);
         if (!guild) {
             console.warn(`[CLEANUP] Target guild ${targetGuildId} not found.`);
