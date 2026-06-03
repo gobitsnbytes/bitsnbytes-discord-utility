@@ -692,7 +692,7 @@ function startWebServer(client) {
         }
     });
 
-    app.get('/api/users', checkAuth, async (req, res) => {
+    app.get('/api/users', async (req, res) => {
         try {
             const users = await db.all(`SELECT discord_id, username, title, booking_link, description, timezone, weekly_hours, calcom_event_type_id, associated_role_id, avatar FROM user_availability WHERE booking_link IS NOT NULL`);
             const resolvedUsers = await Promise.all(users.map(async (u) => {
@@ -711,7 +711,7 @@ function startWebServer(client) {
     });
 
     // Returns the list of active fork city slugs for the scope selector UI
-    app.get('/api/forks', checkAuth, async (req, res) => {
+    app.get('/api/forks', async (req, res) => {
         try {
             const notion = require('./lib/notion');
             const forks = await notion.getForks();
@@ -731,7 +731,7 @@ function startWebServer(client) {
     });
 
     // Returns status of the multi-bot listener pool (total configured, busy, available)
-    app.get('/api/listeners/status', checkAuth, (req, res) => {
+    app.get('/api/listeners/status', (req, res) => {
         try {
             const listenerManager = require('./lib/listenerManager');
             res.json(listenerManager.getListenerStatus());
