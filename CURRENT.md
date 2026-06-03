@@ -786,6 +786,7 @@ bits-bytes-bot/
 
 | Date | Bug | Fix |
 |------|-----|-----|
+| 2026-06-03 | Codebase Overhaul & Stability Patches | Conducted full security/logic audits. Added atomic transaction support, resolved database migration race conditions, integrated middleware auth on API/dashboard routes, removed unreachable gamification code, resolved unit test errors, and cleaned up dead files. |
 | 2026-06-03 | Action-Item Tracker Integration | Added SQLite action_items table, DM notification delivery, fuzzy resolution, and interactive buttons with authorization validation. |
 | 2026-05-31 | Voice/VC Joining & Recording Failures | Added a 2-minute empty channel debounce grace period to prevent instant meeting cleanup/deletion. Added automatic reconnection recovery for voice bots when humans join/remain in the VC (maintaining the 2-human threshold requirement). |
 | 2026-05-31 | VC & meeting start crashes | Fixed a crash in meeting start/auto-commence notifications by making `findMeetingByTempChannel` populate `meeting.attendees` and `meeting.externalEmails` correctly (mirroring `getMeeting` behavior). Added robust defensive checks to `resolveAttendeeUserIds` and tagging routines to completely prevent undefined map exceptions. |
