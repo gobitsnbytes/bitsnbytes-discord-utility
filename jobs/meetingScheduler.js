@@ -98,10 +98,29 @@ module.exports = (client) => {
 						continue;
 					}
 
+					// Get correct VC members (handling listener bot pool)
+					let humanCount = 0;
+					const { getActiveRecordings } = require('../lib/voiceRecorder');
+					const recordingSession = getActiveRecordings().get(meeting.id);
+					if (recordingSession && recordingSession.client) {
+						try {
+							const recGuild = await recordingSession.client.guilds.fetch(guild.id).catch(() => null);
+							const recChannel = recGuild ? await recGuild.channels.fetch(meeting.temp_channel_id).catch(() => null) : null;
+							if (recChannel) {
+								humanCount = recChannel.members.filter(m => !m.user.bot).size;
+							}
+						} catch (recErr) {
+							console.warn(`[SCHEDULER] Failed to check members via recording client:`, recErr.message);
+							humanCount = vcChannel.members.filter(m => !m.user.bot).size;
+						}
+					} else {
+						humanCount = vcChannel.members.filter(m => !m.user.bot).size;
+					}
+
 					// Stale cleanup: if VC has been empty for > 30 minutes after start time
 					const startTime = meeting.activated_at || meeting.scheduled_time;
 					const durationActive = now - startTime;
-					if (durationActive > 30 * 60 * 1000 && vcChannel.members.filter(m => !m.user.bot).size === 0) {
+					if (durationActive > 30 * 60 * 1000 && humanCount === 0) {
 						console.log(`[MEETING] VC empty for over 30 mins. Cleaning up meeting "${meeting.title}"...`);
 
 						// Stop recording and queue transcription BEFORE deleting the channel
