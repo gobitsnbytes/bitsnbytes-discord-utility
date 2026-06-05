@@ -786,7 +786,7 @@ bits-bytes-bot/
 
 | Date | Bug | Fix |
 |------|-----|-----|
-| 2026-06-05 | Cross-Fork Channel Permission Leak | Remapped the bot's general contributor role to the Builder role ID (1480624226414366924) and correctly restored Contributor (1506019068132462804) as the privileged Staff role to resolve permission conflicts and enforce fork isolation. |
+| 2026-06-05 | Staff & Contributor Roles Realignment | Restored assigning the general `@Contributor` role (`1506019068132462804`) to all official members (leads & team members), mapped the true superpower/admin role (`1509256369994203146`) to `STAFF_ROLE_ID`, and added explicit `DENY` overwrites on city channels for the contributor role to guarantee strict fork isolation. |
 | 2026-06-03 | Codebase Overhaul & Stability Patches | Conducted full security/logic audits. Added atomic transaction support, resolved database migration race conditions, integrated middleware auth on API/dashboard routes, removed unreachable gamification code, resolved unit test errors, and cleaned up dead files. |
 | 2026-06-03 | Action-Item Tracker Integration | Added SQLite action_items table, DM notification delivery, fuzzy resolution, and interactive buttons with authorization validation. |
 | 2026-05-31 | Voice/VC Joining & Recording Failures | Added a 2-minute empty channel debounce grace period to prevent instant meeting cleanup/deletion. Added automatic reconnection recovery for voice bots when humans join/remain in the VC (maintaining the 2-human threshold requirement). |

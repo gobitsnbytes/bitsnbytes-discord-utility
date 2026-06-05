@@ -330,9 +330,7 @@ function startWebServer(client) {
                 if (targetMember) {
                     hasContributorRole = targetMember.roles.cache.some(r => 
                         r.name.toLowerCase() === 'contributor' || 
-                        r.name.toLowerCase() === 'builder' || 
-                        r.id === '1506019068132462804' || 
-                        r.id === '1480624226414366924'
+                        r.id === '1506019068132462804'
                     );
 
                     // Resolve Discord city role for contributor
@@ -572,9 +570,7 @@ function startWebServer(client) {
                 const member = await guild.members.fetch(req.user.id).catch(() => null);
                 isContributor = member ? member.roles.cache.some(r => 
                     r.name.toLowerCase() === 'contributor' || 
-                    r.name.toLowerCase() === 'builder' || 
-                    r.id === '1506019068132462804' || 
-                    r.id === '1480624226414366924'
+                    r.id === '1506019068132462804'
                 ) : false;
             }
 
@@ -2127,9 +2123,7 @@ async function runUserCleanup(client) {
             const member = guild.members.cache.get(dbUser.discord_id);
             const hasRole = member && member.roles.cache.some(r => 
                 r.name.toLowerCase() === 'contributor' || 
-                r.name.toLowerCase() === 'builder' || 
-                r.id === '1506019068132462804' || 
-                r.id === '1480624226414366924'
+                r.id === '1506019068132462804'
             );
             if (!hasRole) {
                 console.log(`[CLEANUP] Removing user ${dbUser.username} (${dbUser.discord_id}) because they lack the contributor role.`);
