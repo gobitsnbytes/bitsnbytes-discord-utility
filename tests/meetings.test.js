@@ -21,6 +21,9 @@ jest.mock('../config', () => ({
 	BRANDING: {
 		footerText: 'TEST_FOOTER',
 	},
+	ROLE_IDS: {
+		contributor: 'contrib_role_123'
+	},
 	PRIVACY: {
 		'meet-schedule': true
 	}

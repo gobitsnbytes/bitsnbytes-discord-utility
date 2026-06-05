@@ -53,7 +53,7 @@ module.exports = {
 
 	// 🧬 CORE SERVER ROLE CONFIGURATIONS
 	ROLE_IDS: {
-		contributor: process.env.CONTRIBUTOR_ROLE_ID || '1506019068132462804',
+		contributor: process.env.CONTRIBUTOR_ROLE_ID || '1480624226414366924',
 	},
 
 	// 🧬 CORE SERVER CHANNEL CONFIGURATIONS
