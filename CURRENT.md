@@ -786,6 +786,7 @@ bits-bytes-bot/
 
 | Date | Bug | Fix |
 |------|-----|-----|
+| 2026-06-05 | Cross-Fork Channel Permission Leak | Added explicit deny overrides for the general contributor role in active fork channels and during onboarding setup to prevent inter-fork channel visibility and ensure privacy. |
 | 2026-06-03 | Codebase Overhaul & Stability Patches | Conducted full security/logic audits. Added atomic transaction support, resolved database migration race conditions, integrated middleware auth on API/dashboard routes, removed unreachable gamification code, resolved unit test errors, and cleaned up dead files. |
 | 2026-06-03 | Action-Item Tracker Integration | Added SQLite action_items table, DM notification delivery, fuzzy resolution, and interactive buttons with authorization validation. |
 | 2026-05-31 | Voice/VC Joining & Recording Failures | Added a 2-minute empty channel debounce grace period to prevent instant meeting cleanup/deletion. Added automatic reconnection recovery for voice bots when humans join/remain in the VC (maintaining the 2-human threshold requirement). |
@@ -806,4 +807,4 @@ bits-bytes-bot/
 
 ---
 
-*Last Updated: June 3, 2026*
+*Last Updated: June 5, 2026*
