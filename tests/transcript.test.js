@@ -183,8 +183,8 @@ describe('VcTextCollector Tests', () => {
 		expect(mockMessage.reply).toHaveBeenCalled();
 
 		const collected = collector.stop();
-		expect(collected).toHaveLength(1);
-		expect(collected[0].content).toBe(' !hindi ');
+		// !hindi is now filtered out — it's an operational command, not meeting content
+		expect(collected).toHaveLength(0);
 	});
 });
 
@@ -215,25 +215,19 @@ describe('Speaker Timeline Coalescing & Formatting Tests', () => {
 
 		const result = coalesceTimeline(timeline, sessionStartTime);
 
-		expect(result).toHaveLength(3);
+		// New sweep-line algorithm produces non-overlapping interleaved turn slots:
+		//  1. Alice starts at 1s. Cursor moves to 4s.
+		//  2. Bob starts at 3s but cursor is already at 4s, so Bob's slot starts at 4s. Ends at 7s. Cursor = 7s.
+		//  3. Alice's second segment starts at 5s but cursor is at 7s, so it starts at 7s. Ends at 8s.
+		//     Same speaker as slot before previous (Alice), but prev slot is Bob, so a new Alice slot is created.
+		//  4. Alice speaks again at 13s (large gap). New slot. Cursor = 16s.
+		// Noise burst (200ms) is filtered out.
+		expect(result).toHaveLength(4);
 
-		expect(result[0]).toEqual({
-			displayName: 'Alice',
-			startMs: 1000,
-			endMs: 8000
-		});
-
-		expect(result[1]).toEqual({
-			displayName: 'Bob',
-			startMs: 3000,
-			endMs: 7000
-		});
-
-		expect(result[2]).toEqual({
-			displayName: 'Alice',
-			startMs: 13000,
-			endMs: 16000
-		});
+		expect(result[0]).toEqual({ displayName: 'Alice', startMs: 1000, endMs: 4000 });
+		expect(result[1]).toEqual({ displayName: 'Bob',   startMs: 4000, endMs: 7000 });
+		expect(result[2]).toEqual({ displayName: 'Alice', startMs: 7000, endMs: 8000 });
+		expect(result[3]).toEqual({ displayName: 'Alice', startMs: 13000, endMs: 16000 });
 	});
 
 	test('should handle empty or null timelines gracefully', () => {

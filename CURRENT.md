@@ -590,7 +590,7 @@ Exposes a web scheduling portal (`chrono` hosted at `cal.gobnb.org`) for members
    - Sends direct text notices to late joiners in the VC chat with language translation toggle buttons.
 7. **Recording & Gemini Transcription:**
    - Subscribes to Opus audio streams, decodes, and records audio packets with valid header CRC checksums to prevent FFmpeg mismatches.
-   - Merges separate speaker segments, uploads them to the Google File API, and utilizes `gemini-3.5-flash` to extract a speaker-labeled Hinglish/English transcript and JSON briefs.
+   - Merges separate speaker segments, uploads them to the Google File API, and utilizes `gemini-2.5-flash` to extract a speaker-labeled Hinglish/English transcript and JSON briefs.
 8. **DM Briefs Delivery:**
    - Matches invitee and host emails to registered Discord profiles and registers them in database tables.
    - Formats a summary, key decisions, and action items inside a Discord Embed and DMs it directly to all attendees along with the full transcript as a `.txt` file attachment.
@@ -804,7 +804,8 @@ bits-bytes-bot/
 | 2026-04-29 | Missing NOTION_REMINDERS_DB | Added to .env.example |
 | 2026-04-29 | Leaderboard points calculation | Added on-time bonus (+2) and late penalty (-3) |
 | 2026-04-29 | Missing badges | Added "On Fire" and "Rising Star" badges |
+| 2026-06-06 | **Transcription Overhaul (Quality & Speaker Diarization)** | Fixed invalid model identifiers (`gemini-3.5-flash` → `gemini-2.5-flash`, fallback `gemini-2.0-flash`). Rewrote `buildTranscriptionPrompt` with 10 mandatory anti-hallucination rules, a duration-anchored word-count cap, and a deterministic "Speaker Turn Table" that removes acoustic voice-matching from the LLM. Replaced `coalesceTimeline` (per-user merge, 2.5s window) with `buildSpeakerTurnSlots` (sweep-line algorithm producing truly non-overlapping interleaved turn slots). Added per-track `loudnorm` audio normalization, upgraded bitrate from 48k → 96k, and downsampled output to 16kHz (Gemini-optimal). Raised pipeline timeout from 5 → 10 min. |
 
 ---
 
-*Last Updated: June 5, 2026*
+*Last Updated: June 6, 2026*
