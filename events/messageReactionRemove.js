@@ -1,5 +1,4 @@
 const { Events } = require('discord.js');
-const roleMap = require('../lib/roles');
 
 module.exports = {
 	name: Events.MessageReactionRemove,
@@ -30,11 +29,9 @@ module.exports = {
 			}
 		}
 
-		// 1. Handle Interests picker
-		let roleName = roleMap[reaction.emoji.name];
+		// Handle City picker
 		let matchedCity = null;
 
-		// 2. Handle City picker
 		const embeds = reaction.message.embeds;
 		if (embeds && embeds.length > 0) {
 			const embed = embeds[0];
@@ -53,16 +50,11 @@ module.exports = {
 			}
 		}
 
-		if (!roleName && !matchedCity) return;
+		if (!matchedCity) return;
 
 		try {
 			const member = await reaction.message.guild.members.fetch(user.id);
-			let role;
-			if (roleName) {
-				role = reaction.message.guild.roles.cache.find(r => r.name === roleName);
-			} else if (matchedCity) {
-				role = reaction.message.guild.roles.cache.find(r => r.name.toLowerCase() === matchedCity.toLowerCase());
-			}
+			const role = reaction.message.guild.roles.cache.find(r => r.name.toLowerCase() === matchedCity.toLowerCase());
 
 			if (role) {
 				await member.roles.remove(role);

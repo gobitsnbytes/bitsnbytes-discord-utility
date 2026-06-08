@@ -20,21 +20,6 @@ module.exports = {
 				logger.info(`Found ${botMessages.size} old messages to purge in #roles.`);
 				await Promise.all(botMessages.map(msg => msg.delete().catch(() => { })));
 
-				// Embed 1: Interests
-				const interestsEmbed = new EmbedBuilder()
-					.setTitle('🎯 Pick Your Interests')
-					.setDescription('React below to get your interest roles!')
-					.addFields(
-						{ name: 'Interest Roles', value: '💻 dev  |  🎨 design  |  🔬 research  |  ⚙️ ops' }
-					)
-					.setColor('#5865F2');
-
-				const sentInterests = await rolesChannel.send({ embeds: [interestsEmbed] });
-				const interestEmojis = ['💻', '🎨', '🔬', '⚙️'];
-
-				logger.info('Posting interest reactions to #roles...');
-				await Promise.all(interestEmojis.map(emoji => sentInterests.react(emoji).catch(() => { })));
-
 				// Query Notion active forks
 				const notion = require('../lib/notion');
 				const forks = await notion.getForks().catch(() => []);

@@ -122,6 +122,13 @@ describe('Channel Permissions Sync Tests', () => {
 			},
 		};
 
+		const mockTargetChannel = {
+			id: '1490416132262203533',
+			permissionOverwrites: {
+				edit: jest.fn().mockResolvedValue(true),
+			},
+		};
+
 		mockGuild = {
 			name: 'Test Guild',
 			roles: {
@@ -169,8 +176,15 @@ describe('Channel Permissions Sync Tests', () => {
 				})(),
 			},
 			channels: {
+				fetch: jest.fn().mockImplementation((id) => {
+					if (id === '1490416132262203533') return Promise.resolve(mockTargetChannel);
+					return Promise.resolve(null);
+				}),
 				cache: {
-					get: jest.fn().mockReturnValue(null),
+					get: jest.fn().mockImplementation((id) => {
+						if (id === '1490416132262203533') return mockTargetChannel;
+						return null;
+					}),
 					find: jest.fn().mockImplementation((fn) => {
 						const dummyChannel = { name: 'gobitsnbytes-delhi' };
 						if (fn(dummyChannel)) return mockChannel;
@@ -179,6 +193,8 @@ describe('Channel Permissions Sync Tests', () => {
 				},
 			},
 		};
+
+		mockGuild.mockTargetChannel = mockTargetChannel;
 
 		mockClient = {
 			guilds: {
@@ -220,5 +236,45 @@ describe('Channel Permissions Sync Tests', () => {
 		const leadOver = setCallArgs.find(o => o.id === '123');
 		expect(leadOver).toBeDefined();
 		expect(leadOver.allow).toContain(PermissionFlagsBits.ManageChannels);
+	});
+
+	test('should grant creative role access to channel 1490416132262203533', async () => {
+		await syncForkPermissions(mockClient, mockFork);
+
+		expect(mockGuild.mockTargetChannel.permissionOverwrites.edit).toHaveBeenCalledWith(
+			'new_role_id',
+			expect.objectContaining({
+				ViewChannel: true,
+				SendMessages: true,
+			}),
+			expect.any(Object)
+		);
+	});
+
+	test('should remove track roles from non-staff and non-contributor members', async () => {
+		// Mock a guild member who is not staff and has no contributor role, but has a track role
+		const mockBadMember = {
+			id: '444',
+			roles: {
+				cache: {
+					has: jest.fn().mockImplementation((roleId) => {
+						// Pretend they have the 'new_role_id' track role
+						return roleId === 'new_role_id';
+					}),
+				},
+				remove: jest.fn().mockResolvedValue(true),
+			},
+		};
+
+		// Add this bad member to our guild mock
+		mockGuild.members.cache.set('444', mockBadMember);
+
+		await syncForkPermissions(mockClient, mockFork);
+
+		// Expect that they got the track role removed
+		expect(mockBadMember.roles.remove).toHaveBeenCalledWith(
+			expect.objectContaining({ id: 'new_role_id' }),
+			expect.any(String)
+		);
 	});
 });
