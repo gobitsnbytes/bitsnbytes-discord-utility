@@ -119,7 +119,7 @@ module.exports = {
 		tempDir: require('path').join(require('os').tmpdir(), 'bnb-recordings'),
 		maxConcurrentRecordings: 3,
 		minMeetingDurationMs: 60 * 1000,    // 1 minute minimum
-		postProcessingTimeoutMs: 10 * 60 * 1000, // 10 min max per pipeline (accounts for Gemini 2.5-flash processing)
+		postProcessingTimeoutMs: 35 * 60 * 1000, // 35 min max per pipeline (accounts for large FFmpeg merges and Gemini)
 		dmRateLimitMs: 1000,                // 1 DM per second
 		consent: {
 			audioEnglish: './assets/english.mp3',
@@ -133,6 +133,6 @@ module.exports = {
 		maxRetries: 3,
 		retryBackoffMs: 2000,
 		// gemini-2.5-flash may take longer for audio analysis on lengthy meetings
-		transcriptionTimeoutMs: 8 * 60 * 1000,  // 8 min cap per Gemini call
+		transcriptionTimeoutMs: 30 * 60 * 1000,  // 30 min cap per Gemini call
 	}
 };
