@@ -45,7 +45,10 @@
     "onlyBuiltDependencies": [
       "sqlite3",
       "@discordjs/opus",
-      "sodium-native"
+      "sodium-native",
+      "node-crc",
+      "@google/genai",
+      "protobufjs"
     ]
   }
 }
