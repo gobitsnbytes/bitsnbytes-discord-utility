@@ -238,6 +238,7 @@ safeStartJob('./jobs/monthlyWinner', client, 'monthlyWinner');
 safeStartJob('./jobs/reportLateUpdater', client, 'reportLateUpdater');
 safeStartJob('./jobs/meetingScheduler', client, 'meetingScheduler');
 safeStartJob('./jobs/notionProfileCheck', client, 'notionProfileCheck');
+safeStartJob('./jobs/meetingRecovery', client, 'meetingRecovery');
 
 console.log('[BOOT] Job initialization complete.');
 

@@ -1,6 +1,63 @@
 const { Events, EmbedBuilder } = require('discord.js');
 
 const inviteRegex = /(discord\.(gg|io|me|li)\/.+|discordapp\.com\/invite\/.+)/i;
+
+// Self-promo and spam keywords (case-insensitive)
+const spamKeywords = [
+	'join my server',
+	'check out my server',
+	'discord server',
+	'follow my instagram',
+	'follow me on',
+	'subscribe to my',
+	'donate to me',
+	'paypal.me',
+	'ko-fi.com',
+	'buy me a coffee',
+	'stipend',
+	'$',
+	'prize money',
+	'registration link',
+	'sign up now',
+	'win prize',
+	'hackathon registration',
+	'submit your project',
+	'register at',
+	'free v-bucks',
+	'free nitro',
+	'discord nitro',
+	'steam gift',
+	'gift card'
+];
+
+// Allowed domains (whitelist)
+const allowedDomains = [
+	'github.com',
+	'gitlab.com',
+	'stackoverflow.com',
+	'replit.com',
+	'codesandbox.io',
+	'netlify.app',
+	'vercel.app',
+	'render.com',
+	'heroku.com',
+	'localhost',
+	'youtu.be',
+	'youtube.com',
+	'discord.com'
+];
+
+// Blocked URL patterns (external promo/spam)
+const blockedUrlPatterns = [
+	/hackathon/i,
+	/ event /i,
+	/ registration/i,
+	/winners?/i,
+	/prize/i,
+	/stipend/i,
+	/certificate/i
+];
+
 const userMessageCounts = new Map();
 
 // Periodic cleanup to avoid memory leaks
@@ -38,6 +95,56 @@ module.exports = {
 				await opsChannel.send({ embeds: [logEmbed] });
 			}
 			return;
+		}
+
+		// 1.5: Block self-promo and spam keywords
+		const lowerContent = message.content.toLowerCase();
+		const matchedKeywords = spamKeywords.filter(keyword => lowerContent.includes(keyword.toLowerCase()));
+		
+		if (matchedKeywords.length > 0) {
+			await message.delete();
+			await message.channel.send(`🚫 <@${message.author.id}>, self-promotion and spam are not allowed.`);
+			if (opsChannel) {
+				const logEmbed = new EmbedBuilder()
+					.setTitle('🛡️ Automod: Self-Promo/Spam Filtered')
+					.addFields(
+						{ name: 'User', value: `${message.author.tag} (${message.author.id})` },
+						{ name: 'Channel', value: message.channel.toString() },
+						{ name: 'Matched', value: matchedKeywords.join(', ') }
+					)
+					.setColor('#E74C3C');
+				await opsChannel.send({ embeds: [logEmbed] });
+			}
+			return;
+		}
+
+		// 1.6: Block suspicious external links (hackathon, prizes, etc.)
+		const urlRegex = /(https?:\/\/[^\s]+)/g;
+		const urls = message.content.match(urlRegex) || [];
+		
+		for (const url of urls) {
+			// Check if URL is from allowed domains
+			const isAllowed = allowedDomains.some(domain => url.includes(domain));
+			if (isAllowed) continue;
+			
+			// Check if URL matches blocked patterns
+			const isBlocked = blockedUrlPatterns.some(pattern => pattern.test(url));
+			if (isBlocked) {
+				await message.delete();
+				await message.channel.send(`🚫 <@${message.author.id}>, links to external events/registrations are not allowed.`);
+				if (opsChannel) {
+					const logEmbed = new EmbedBuilder()
+						.setTitle('🛡️ Automod: Suspicious Link Filtered')
+						.addFields(
+							{ name: 'User', value: `${message.author.tag} (${message.author.id})` },
+							{ name: 'Channel', value: message.channel.toString() },
+							{ name: 'URL', value: url.substring(0, 100) }
+						)
+						.setColor('#E74C3C');
+					await opsChannel.send({ embeds: [logEmbed] });
+				}
+				return;
+			}
 		}
 
 		// 2. Block mass mentions (5+)
