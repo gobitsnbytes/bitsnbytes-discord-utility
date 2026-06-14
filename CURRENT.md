@@ -805,7 +805,8 @@ bits-bytes-bot/
 | 2026-04-29 | Leaderboard points calculation | Added on-time bonus (+2) and late penalty (-3) |
 | 2026-04-29 | Missing badges | Added "On Fire" and "Rising Star" badges |
 | 2026-06-06 | **Transcription Overhaul (Quality & Speaker Diarization)** | Fixed invalid model identifiers (`gemini-3.5-flash` → `gemini-2.5-flash`, fallback `gemini-2.0-flash`). Rewrote `buildTranscriptionPrompt` with 10 mandatory anti-hallucination rules, a duration-anchored word-count cap, and a deterministic "Speaker Turn Table" that removes acoustic voice-matching from the LLM. Replaced `coalesceTimeline` (per-user merge, 2.5s window) with `buildSpeakerTurnSlots` (sweep-line algorithm producing truly non-overlapping interleaved turn slots). Added per-track `loudnorm` audio normalization, upgraded bitrate from 48k → 96k, and downsampled output to 16kHz (Gemini-optimal). Raised pipeline timeout from 5 → 10 min. |
+| 2026-06-14 | **Gemini Connection Timeout Hardening** | Configured global `undici` dispatcher overrides (10m header / 20m body timeouts) and set explicit `httpOptions.timeout` (10m) on the `GoogleGenAI` client in `lib/transcriber.js` to prevent transcription of long meetings from dropping/failing with network `fetch failed` errors. |
 
 ---
 
-*Last Updated: June 6, 2026*
+*Last Updated: June 14, 2026*
