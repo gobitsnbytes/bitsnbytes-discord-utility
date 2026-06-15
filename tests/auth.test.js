@@ -353,7 +353,9 @@ describe('Core Admin and Parent Role Resolution', () => {
 					{ id: 'another_dept_id', name: 'Department Lead' },
 					{ id: 'tech_contrib_id', name: 'Tech Contributor' },
 					{ id: 'creative_id', name: 'creative' },
-					{ id: 'builder_id', name: 'builder' }
+					{ id: 'builder_id', name: 'builder' },
+					{ id: '1509224762906247178', name: 'outreach-lead' },
+					{ id: '1509224752747909351', name: 'outreach' }
 				]
 			}
 		};
@@ -367,8 +369,10 @@ describe('Core Admin and Parent Role Resolution', () => {
 		expect(ids).toContain('1509256369994203146');
 		expect(ids).toContain('dept_lead_id');
 		expect(ids).toContain('another_dept_id');
+		expect(ids).toContain('1509224762906247178'); // outreach-lead by ID
 		expect(ids).not.toContain('tech_contrib_id');
 		expect(ids).not.toContain('creative_id');
+		expect(ids).not.toContain('1509224752747909351'); // outreach contributor should not be in core admins
 	});
 
 	test('getCoreAdminAndParentRoles should retrieve admins plus parent track contributors', () => {
@@ -377,7 +381,9 @@ describe('Core Admin and Parent Role Resolution', () => {
 		
 		expect(ids).toContain('hq_role_id');
 		expect(ids).toContain('tech_contrib_id');
-		expect(ids).not.toContain('creative_id');
+		expect(ids).toContain('1509224762906247178'); // admin outreach-lead
+		expect(ids).toContain('1509224752747909351'); // parent track outreach contributor by ID
+		expect(ids).toContain('creative_id'); // creative is resolved as a parent track role name
 		expect(ids).not.toContain('builder_id');
 	});
 });

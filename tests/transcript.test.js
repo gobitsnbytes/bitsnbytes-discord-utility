@@ -3,7 +3,7 @@ const { VcTextCollector } = require('../lib/vcTextCollector');
 const path = require('path');
 const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
-const dbPath = path.join(__dirname, '../data/bot.db');
+const dbPath = require('../lib/db').dbPath;
 const db = new sqlite3.Database(dbPath);
 
 // Mock config
@@ -38,6 +38,7 @@ describe('Meeting Transcripts Database Tests', () => {
 	const testUserId = 'user_attendee_123';
 
 	beforeAll(async () => {
+		await meetingsDb.initPromise;
 		await new Promise((resolve) => {
 			db.serialize(() => {
 				db.run("DELETE FROM meeting_transcripts WHERE meeting_id = ?", [testMeetingId], () => {

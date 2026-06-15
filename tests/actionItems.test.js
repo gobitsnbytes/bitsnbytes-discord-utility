@@ -2,7 +2,7 @@ const meetingsDb = require('../lib/meetingsDb');
 const interactionCreate = require('../events/interactionCreate');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const dbPath = path.join(__dirname, '../data/bot.db');
+const dbPath = require('../lib/db').dbPath;
 const db = new sqlite3.Database(dbPath);
 
 jest.mock('../config', () => ({
@@ -30,15 +30,8 @@ describe('Action Items Database and Interaction Tests', () => {
 	let createdActionItemId;
 
 	beforeAll(async () => {
-		const libDb = require('../lib/db');
-		for (let i = 0; i < 20; i++) {
-			try {
-				await libDb.get("SELECT status FROM action_items LIMIT 0");
-				break;
-			} catch (e) {
-				await new Promise(resolve => setTimeout(resolve, 100));
-			}
-		}
+		// Wait for meetingsDb migrations to complete
+		await meetingsDb.initPromise;
 
 		await new Promise((resolve) => {
 			db.serialize(() => {

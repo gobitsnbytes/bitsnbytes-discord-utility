@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { Client, Collection, GatewayIntentBits, Partials, REST, Routes } = require('discord.js');
+const { Client, Collection, GatewayIntentBits, Partials, REST, Routes, ActivityType } = require('discord.js');
 require('dotenv').config();
 const logger = require('./lib/logger');
 const { getGitInfo } = require('./lib/git');
@@ -102,6 +102,27 @@ client.once('ready', async () => {
 			);
 		} else {
 			logger.boot(`SYSTEM // PROTOCOL_ONLINE`, `**SYSTEM STATUS**\n${stats}`);
+		}
+
+		// Set cool presence/status activity for the main bot
+		try {
+			client.user.setPresence({
+				activities: [{ name: 'Notion Sync // /help', type: ActivityType.Playing }],
+				status: 'online'
+			});
+		} catch (presErr) {
+			console.warn(`[BOOT] Failed to set presence:`, presErr.message);
+		}
+
+		// Set cool bio/About Me description for the main bot
+		try {
+			const bio = "BnB Bot — The internal operations layer for the Bits&Bytes Discord server. Bridging Discord interactions and Notion workspaces seamlessly.";
+			if (client.application) {
+				await client.application.edit({ description: bio });
+				console.log(`[BOOT] Main bot application bio updated successfully.`);
+			}
+		} catch (bioErr) {
+			console.warn(`[BOOT] Failed to update main bot application bio:`, bioErr.message);
 		}
 
 		// Self-healing / Startup Resumption

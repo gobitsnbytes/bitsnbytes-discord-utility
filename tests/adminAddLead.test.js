@@ -4,7 +4,7 @@ const { ChannelType } = require('discord.js');
 const notion = require('../lib/notion');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const dbPath = path.join(__dirname, '../data/bot.db');
+const dbPath = require('../lib/db').dbPath;
 const db = new sqlite3.Database(dbPath);
 
 // Mock notion
@@ -38,6 +38,7 @@ describe('Admin Add Lead Database helper tests', () => {
 	const city = 'San Francisco';
 
 	beforeAll(async () => {
+		await meetingsDb.initPromise;
 		await new Promise((resolve) => {
 			db.run("DELETE FROM pending_notion_profiles", resolve);
 		});
