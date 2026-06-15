@@ -25,8 +25,18 @@ module.exports = (client) => {
 			const guild = client.guilds.cache.first(); // Assumes the bot is only in one guild
 			if (!guild) return;
 
-			const leadsCouncil = guild.channels.cache.find(c => c.name === 'leads-council');
-			const teamForks = guild.channels.cache.find(c => c.name === 'team-forks');
+			let leadsCouncil = guild.channels.cache.find(c => c.name === 'leads-council');
+			let teamForks = guild.channels.cache.find(c => c.name === 'team-forks');
+
+			if (!leadsCouncil || !teamForks) {
+				try {
+					const allChannels = await guild.channels.fetch();
+					if (!leadsCouncil) leadsCouncil = allChannels.find(c => c.name === 'leads-council');
+					if (!teamForks) teamForks = allChannels.find(c => c.name === 'team-forks');
+				} catch (fetchErr) {
+					logger.error('Failed to fetch all channels for fallback in staleCheck:', fetchErr.message);
+				}
+			}
 			const now = new Date();
 			const isoWeek = getISOWeek(now);
 
