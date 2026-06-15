@@ -6,7 +6,7 @@ const auth = require('../lib/auth');
 // Shared execution logic to process report submission
 async function processReportSubmission(user, city, type, notes, attachmentUrl, guild) {
 	// Enforce authorization check
-	const isAuthorized = await auth.isAuthorizedForCity(user, city, guild);
+	const isAuthorized = await auth.isAuthorizedForCity(user, city, guild, 'modify');
 	if (!isAuthorized) {
 		return {
 			success: false,
@@ -153,6 +153,11 @@ module.exports = {
 			option
 				.setName('attachment')
 				.setDescription('Attachment URL (PDF, etc.)')
+				.setRequired(false))
+		.addAttachmentOption(option =>
+			option
+				.setName('file')
+				.setDescription('Direct PDF/file upload')
 				.setRequired(false)),
 
 	async execute(interaction) {
@@ -161,7 +166,11 @@ module.exports = {
 		const city = interaction.options.getString('city');
 		const type = interaction.options.getString('type');
 		const notes = interaction.options.getString('notes') || '';
-		const attachmentUrl = interaction.options.getString('attachment') || null;
+		const file = interaction.options.getAttachment('file');
+		let attachmentUrl = interaction.options.getString('attachment') || null;
+		if (file) {
+			attachmentUrl = file.url;
+		}
 
 		// If arguments are missing, present the interactive form button
 		if (!city || !type) {
