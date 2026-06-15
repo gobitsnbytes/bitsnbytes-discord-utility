@@ -2,7 +2,7 @@
  * Unit tests for lib/auth.js
  */
 
-const { isAuthorizedForCity, isAuthorizedForForkId } = require('../lib/auth');
+const { isAuthorizedForCity, isAuthorizedForForkId, getCoreAdminRoles, getCoreAdminAndParentRoles } = require('../lib/auth');
 const notion = require('../lib/notion');
 
 // Mock notion module
@@ -332,3 +332,45 @@ describe('User Availability Contributor Restriction & Cleanup', () => {
 		expect(sessions.has('sid_left')).toBe(false);
 	});
 });
+
+describe('Core Admin and Parent Role Resolution', () => {
+	let mockGuild;
+	beforeEach(() => {
+		mockGuild = {
+			roles: {
+				cache: [
+					{ id: 'hq_role_id', name: 'HQ' },
+					{ id: '1509256369994203146', name: 'staff' },
+					{ id: 'dept_lead_id', name: 'Creative Department Lead' },
+					{ id: 'another_dept_id', name: 'Department Lead' },
+					{ id: 'tech_contrib_id', name: 'Tech Contributor' },
+					{ id: 'creative_id', name: 'creative' },
+					{ id: 'builder_id', name: 'builder' }
+				]
+			}
+		};
+	});
+
+	test('getCoreAdminRoles should retrieve hq, staff matching ID, and department leads', () => {
+		const roles = getCoreAdminRoles(mockGuild);
+		const ids = roles.map(r => r.id);
+		
+		expect(ids).toContain('hq_role_id');
+		expect(ids).toContain('1509256369994203146');
+		expect(ids).toContain('dept_lead_id');
+		expect(ids).toContain('another_dept_id');
+		expect(ids).not.toContain('tech_contrib_id');
+		expect(ids).not.toContain('creative_id');
+	});
+
+	test('getCoreAdminAndParentRoles should retrieve admins plus parent track contributors', () => {
+		const roles = getCoreAdminAndParentRoles(mockGuild);
+		const ids = roles.map(r => r.id);
+		
+		expect(ids).toContain('hq_role_id');
+		expect(ids).toContain('tech_contrib_id');
+		expect(ids).not.toContain('creative_id');
+		expect(ids).not.toContain('builder_id');
+	});
+});
+

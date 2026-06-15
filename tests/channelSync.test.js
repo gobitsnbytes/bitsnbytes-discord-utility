@@ -129,31 +129,30 @@ describe('Channel Permissions Sync Tests', () => {
 			},
 		};
 
+		const mockRolesMap = new Map([
+			['city_role_id', mockCityRole],
+			['contrib_city_role_id', mockContributorCityRole],
+			['contributor_role_id', mockContributorRole],
+			['fork_lead_role_id', mockForkLeadRole],
+			['staff_role_id', mockStaffRole]
+		]);
+		mockRolesMap.find = jest.fn().mockImplementation((fn) => {
+			return Array.from(mockRolesMap.values()).find(fn) || null;
+		});
+
 		mockGuild = {
 			name: 'Test Guild',
 			roles: {
 				everyone: { id: 'everyone_role_id' },
-				cache: {
-					find: jest.fn().mockImplementation((fn) => {
-						if (fn(mockCityRole)) return mockCityRole;
-						if (fn(mockContributorCityRole)) return mockContributorCityRole;
-						if (fn(mockContributorRole)) return mockContributorRole;
-						return null;
-					}),
-					get: jest.fn().mockImplementation((id) => {
-						if (id === 'fork_lead_role_id') return mockForkLeadRole;
-						if (id === 'staff_role_id') return mockStaffRole;
-						if (id === 'city_role_id') return mockCityRole;
-						if (id === 'contrib_city_role_id') return mockContributorCityRole;
-						if (id === 'contributor_role_id') return mockContributorRole;
-						return null;
-					}),
-				},
+				cache: mockRolesMap,
 				create: jest.fn().mockImplementation((options) => {
-					if (options.name === 'Delhi') return Promise.resolve(mockCityRole);
-					if (options.name === 'contributor-Delhi') return Promise.resolve(mockContributorCityRole);
-					if (options.name === 'contributor') return Promise.resolve(mockContributorRole);
-					return Promise.resolve({ id: 'new_role_id', name: options.name });
+					let role;
+					if (options.name === 'Delhi') role = mockCityRole;
+					else if (options.name === 'contributor-Delhi') role = mockContributorCityRole;
+					else if (options.name === 'contributor') role = mockContributorRole;
+					else role = { id: `role_${options.name.toLowerCase().replace(/\s+/g, '-')}`, name: options.name };
+					mockRolesMap.set(role.id, role);
+					return Promise.resolve(role);
 				}),
 			},
 			members: {
@@ -236,13 +235,28 @@ describe('Channel Permissions Sync Tests', () => {
 		const leadOver = setCallArgs.find(o => o.id === '123');
 		expect(leadOver).toBeDefined();
 		expect(leadOver.allow).toContain(PermissionFlagsBits.ManageChannels);
+
+		// check contributor role is denied ViewChannel
+		const contributorOver = setCallArgs.find(o => o.id === 'contributor_role_id');
+		expect(contributorOver).toBeDefined();
+		expect(contributorOver.deny).toContain(PermissionFlagsBits.ViewChannel);
+
+		// check staff role is allowed
+		const staffOver = setCallArgs.find(o => o.id === 'staff_role_id');
+		expect(staffOver).toBeDefined();
+		expect(staffOver.allow).toContain(PermissionFlagsBits.ViewChannel);
+
+		// check a global track role (like tech) is denied
+		const techOver = setCallArgs.find(o => o.id === 'role_tech');
+		expect(techOver).toBeDefined();
+		expect(techOver.deny).toContain(PermissionFlagsBits.ViewChannel);
 	});
 
 	test('should grant creative role access to channel 1490416132262203533', async () => {
 		await syncForkPermissions(mockClient, mockFork);
 
 		expect(mockGuild.mockTargetChannel.permissionOverwrites.edit).toHaveBeenCalledWith(
-			'new_role_id',
+			'role_creative',
 			expect.objectContaining({
 				ViewChannel: true,
 				SendMessages: true,
@@ -258,8 +272,8 @@ describe('Channel Permissions Sync Tests', () => {
 			roles: {
 				cache: {
 					has: jest.fn().mockImplementation((roleId) => {
-						// Pretend they have the 'new_role_id' track role
-						return roleId === 'new_role_id';
+						// Pretend they have the 'role_tech' track role
+						return roleId === 'role_tech';
 					}),
 				},
 				remove: jest.fn().mockResolvedValue(true),
@@ -273,7 +287,7 @@ describe('Channel Permissions Sync Tests', () => {
 
 		// Expect that they got the track role removed
 		expect(mockBadMember.roles.remove).toHaveBeenCalledWith(
-			expect.objectContaining({ id: 'new_role_id' }),
+			expect.objectContaining({ id: 'role_tech' }),
 			expect.any(String)
 		);
 	});
