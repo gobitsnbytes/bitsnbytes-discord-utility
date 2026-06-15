@@ -114,6 +114,13 @@ module.exports = {
 				createdBy: interaction.user.id,
 			});
 
+			// Auto-complete Onboarding Step 7 (First event planned)
+			const onboardingStatus = await notion.getOnboardingStatus(fork.id).catch(() => null);
+			if (onboardingStatus && !onboardingStatus.steps.find(s => s.step === 7)?.completed) {
+				await notion.updateOnboardingStep(fork.id, 7, true).catch(() => {});
+				console.log(`[EVENT_CREATE] Automatically marked Onboarding Step 7 complete for ${city}.`);
+			}
+
 			// Push to Cal.com -> Google Calendar for visibility
 			let calcomBookingId = null;
 			if (process.env.CALCOM_API_KEY && process.env.CALCOM_EVENT_TYPE_30) {

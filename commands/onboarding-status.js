@@ -2,6 +2,62 @@ const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js'
 const notion = require('../lib/notion');
 const onboarding = require('../lib/onboarding');
 const config = require('../config');
+const auth = require('../lib/auth');
+
+async function selfHealOnboarding(fork, guild) {
+	const city = notion.getCityName(fork) || fork.properties['What city are you in?']?.rich_text?.[0]?.text?.content;
+	if (!city || !guild) return;
+	
+	const status = await notion.getOnboardingStatus(fork.id).catch(() => null);
+	if (!status) return;
+	
+	const step2 = status.steps.find(s => s.step === 2);
+	if (step2 && !step2.completed) {
+		const normalizedCity = city.toLowerCase().replace(/\s+/g, '-');
+		let channelExists = guild.channels.cache.some(c => c.name === city.toLowerCase() || c.name === normalizedCity);
+		if (!channelExists) {
+			try {
+				const allChannels = await guild.channels.fetch();
+				channelExists = allChannels.some(c => c.name === city.toLowerCase() || c.name === normalizedCity);
+			} catch (err) {
+				console.warn('[ONBOARDING] Fallback channel fetch failed:', err.message);
+			}
+		}
+		if (channelExists) {
+			await notion.updateOnboardingStep(fork.id, 2, true).catch(() => {});
+			console.log(`[ONBOARDING SELF-HEAL] Step 2 complete for ${city}`);
+		}
+	}
+	
+	const step5 = status.steps.find(s => s.step === 5);
+	if (step5 && !step5.completed) {
+		const lastPulse = fork.properties['Last Pulse']?.date?.start;
+		if (lastPulse) {
+			await notion.updateOnboardingStep(fork.id, 5, true).catch(() => {});
+			console.log(`[ONBOARDING SELF-HEAL] Step 5 complete for ${city}`);
+		}
+	}
+	
+	const step6 = status.steps.find(s => s.step === 6);
+	if (step6 && !step6.completed) {
+		const teamMembers = await notion.getTeamMembers(fork.id).catch(() => []);
+		const teamValidator = require('../lib/teamValidator');
+		const validation = teamValidator.validateTeam(teamMembers);
+		if (validation.missingRoles.length === 0) {
+			await notion.updateOnboardingStep(fork.id, 6, true).catch(() => {});
+			console.log(`[ONBOARDING SELF-HEAL] Step 6 complete for ${city}`);
+		}
+	}
+	
+	const step7 = status.steps.find(s => s.step === 7);
+	if (step7 && !step7.completed) {
+		const eventsList = await notion.getEvents(fork.id).catch(() => []);
+		if (eventsList.length > 0) {
+			await notion.updateOnboardingStep(fork.id, 7, true).catch(() => {});
+			console.log(`[ONBOARDING SELF-HEAL] Step 7 complete for ${city}`);
+		}
+	}
+}
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -18,16 +74,48 @@ module.exports = {
 		await interaction.deferReply({ flags });
 
 		try {
-			const city = interaction.options.getString('city');
+			let city = interaction.options.getString('city');
+			const member = interaction.member;
+			const isGlobal = auth.isExecutiveLeader(member) || auth.isDepartmentLead(member) || auth.isParentTrackContributor(member);
 
-			// Single fork view
+			if (!city) {
+				if (isGlobal) {
+					// Fall through to all forks
+				} else {
+					const userCity = auth.getMemberCity(member);
+					if (userCity) {
+						city = userCity;
+					} else {
+						const unauthorizedEmbed = new EmbedBuilder()
+							.setTitle(`❌ PROTOCOL_UNAUTHORIZED`)
+							.setDescription('Your credentials do not grant access to view overall pending onboardings. Please specify a city.')
+							.setColor(config.COLORS.error)
+							.setFooter({ text: config.BRANDING.footerText });
+						return await interaction.editReply({ embeds: [unauthorizedEmbed] });
+					}
+				}
+			}
+
 			if (city) {
+				const isAuthorized = await auth.isAuthorizedForCity(interaction.user, city, interaction.guild, 'view');
+				if (!isAuthorized) {
+					const unauthorizedEmbed = new EmbedBuilder()
+						.setTitle(`❌ PROTOCOL_UNAUTHORIZED`)
+						.setDescription(`Your credentials do not grant access to view onboarding status for the **${city.toUpperCase()}** node.`)
+						.setColor(config.COLORS.error)
+						.setFooter({ text: config.BRANDING.footerText });
+					return await interaction.editReply({ embeds: [unauthorizedEmbed] });
+				}
+
 				const fork = await notion.findForkByCity(city);
 				if (!fork) {
 					return await interaction.editReply({
 						content: `${config.EMOJIS.error} Fork not found: ${city}`,
 					});
 				}
+
+				// Run self-healing before displaying
+				await selfHealOnboarding(fork, interaction.guild);
 
 				const onboardingStatus = await notion.getOnboardingStatus(fork.id);
 				const statusLabel = onboarding.getOnboardingStatusLabel(onboardingStatus);
@@ -38,7 +126,6 @@ module.exports = {
 					.setTimestamp()
 					.setFooter({ text: config.BRANDING.footerText });
 
-				// Progress overview
 				const progressBar = onboarding.getProgressBar(onboardingStatus.progress);
 				embed.addFields({
 					name: `📊 PROGRESS: ${onboardingStatus.progress}/${onboardingStatus.total} (${onboarding.getCompletionPercentage(onboardingStatus)}%)`,
@@ -46,7 +133,6 @@ module.exports = {
 					inline: false,
 				});
 
-				// Steps checklist
 				const stepsDisplay = onboarding.formatOnboardingProgress(onboardingStatus);
 				embed.addFields({
 					name: '📋 ONBOARDING_CHECKLIST',
@@ -54,7 +140,6 @@ module.exports = {
 					inline: false,
 				});
 
-				// Next step if incomplete
 				if (!onboarding.isOnboardingComplete(onboardingStatus)) {
 					const nextStep = onboarding.getNextPendingStep(onboardingStatus);
 					if (nextStep) {
@@ -74,9 +159,19 @@ module.exports = {
 
 				await interaction.editReply({ embeds: [embed] });
 			} else {
-				// All forks view - show pending onboardings
+				// All forks view
 				const forks = await notion.getForks();
 				const activeForks = forks.filter(f => f.properties?.Status?.select?.name === 'Active');
+
+				if (activeForks.length === 0) {
+					return await interaction.editReply({
+						content: `${config.EMOJIS.error} No active forks found.`,
+					});
+				}
+
+				// Run self-healing for all active forks in parallel
+				const healTasks = activeForks.map(fork => () => selfHealOnboarding(fork, interaction.guild));
+				await notion.limitConcurrency(healTasks, 3);
 
 				const forkStatuses = [];
 				const tasks = activeForks.map(fork => async () => {
@@ -136,7 +231,6 @@ module.exports = {
 					inline: false,
 				});
 
-				// Summary stats
 				const totalPending = forkStatuses.length;
 				const avgProgress = Math.round(
 					forkStatuses.reduce((sum, f) => sum + f.status.progress, 0) / totalPending

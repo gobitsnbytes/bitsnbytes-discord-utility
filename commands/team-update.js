@@ -110,6 +110,15 @@ module.exports = {
 				const teamMembers = await notion.getTeamMembers(forkId);
 				const validation = teamValidator.validateTeam(teamMembers);
 
+				if (validation.missingRoles.length === 0) {
+					// Auto-complete Onboarding Step 6 (Team structure defined)
+					const onboardingStatus = await notion.getOnboardingStatus(forkId).catch(() => null);
+					if (onboardingStatus && !onboardingStatus.steps.find(s => s.step === 6)?.completed) {
+						await notion.updateOnboardingStep(forkId, 6, true).catch(() => {});
+						console.log(`[TEAM_UPDATE] Automatically marked Onboarding Step 6 complete for ${city}.`);
+					}
+				}
+
 				const embed = new EmbedBuilder()
 					.setTitle(`${config.EMOJIS.protocol} TEAM_UPDATE // ${city.toUpperCase()}`)
 					.setColor(config.COLORS.success)

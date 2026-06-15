@@ -49,6 +49,12 @@ module.exports = {
 			const fork = await notion.findForkByCity(city);
 			if (fork) {
 				await notion.updatePulse(fork.id, new Date().toISOString());
+				// Auto-complete Onboarding Step 5 (First pulse submitted)
+				const onboardingStatus = await notion.getOnboardingStatus(fork.id).catch(() => null);
+				if (onboardingStatus && !onboardingStatus.steps.find(s => s.step === 5)?.completed) {
+					await notion.updateOnboardingStep(fork.id, 5, true).catch(() => {});
+					console.log(`[PULSE] Automatically marked Onboarding Step 5 complete for ${city}.`);
+				}
 			}
 
 			const successEmbed = new EmbedBuilder()
