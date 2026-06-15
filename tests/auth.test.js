@@ -77,6 +77,14 @@ describe('Auth Layer Tests', () => {
 			expect(mockGuild.members.fetch).toHaveBeenCalledWith('user_123');
 		});
 
+		test('should authorize HQ role users (admin bypass) by ID', async () => {
+			mockMember.roles.cache.has.mockImplementation((roleId) => roleId === '1509256369994203146');
+			
+			const result = await isAuthorizedForCity(mockUser, 'Delhi', mockGuild);
+			
+			expect(result).toBe(true);
+		});
+
 		test('should not authorize users with ManageRoles permissions unless they are lead/staff', async () => {
 			mockMember.permissions.has.mockImplementation((perm) => perm === 'ManageRoles');
 			notion.findForkByCity.mockResolvedValue(null);
