@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js'
 const notion = require('../lib/notion');
 const teamValidator = require('../lib/teamValidator');
 const config = require('../config');
+const auth = require('../lib/auth');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -18,10 +19,38 @@ module.exports = {
 		await interaction.deferReply({ flags });
 
 		try {
-			const city = interaction.options.getString('city');
+			let city = interaction.options.getString('city');
+			const member = interaction.member;
+			const isGlobal = auth.isExecutiveLeader(member) || auth.isDepartmentLead(member) || auth.isParentTrackContributor(member);
 
-			// Single fork view
+			if (!city) {
+				if (isGlobal) {
+					// Fall through to the network overview
+				} else {
+					const userCity = auth.getMemberCity(member);
+					if (userCity) {
+						city = userCity;
+					} else {
+						const unauthorizedEmbed = new EmbedBuilder()
+							.setTitle(`❌ PROTOCOL_UNAUTHORIZED`)
+							.setDescription('Your credentials do not grant access to view overall network team summaries. Please specify a city.')
+							.setColor(config.COLORS.error)
+							.setFooter({ text: config.BRANDING.footerText });
+						return await interaction.editReply({ embeds: [unauthorizedEmbed] });
+					}
+				}
+			}
+
 			if (city) {
+				const isAuthorized = await auth.isAuthorizedForCity(interaction.user, city, interaction.guild, 'view');
+				if (!isAuthorized) {
+					const unauthorizedEmbed = new EmbedBuilder()
+						.setTitle(`❌ PROTOCOL_UNAUTHORIZED`)
+						.setDescription(`Your credentials do not grant access to view structure for the **${city.toUpperCase()}** node.`)
+						.setColor(config.COLORS.error)
+						.setFooter({ text: config.BRANDING.footerText });
+					return await interaction.editReply({ embeds: [unauthorizedEmbed] });
+				}
 				const fork = await notion.findForkByCity(city);
 				if (!fork) {
 					return await interaction.editReply({
