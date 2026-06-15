@@ -1,7 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection, GatewayIntentBits, Partials, REST, Routes } = require('discord.js');
-require('./lib/cleanEmbeds');
 require('dotenv').config();
 const logger = require('./lib/logger');
 const { getGitInfo } = require('./lib/git');
