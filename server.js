@@ -1026,6 +1026,17 @@ function startWebServer(client) {
             // Perform the reschedule
             const updatedMeeting = await meetingsDb.rescheduleMeeting(meeting.id, newStartMs, newEndMs, reason, req.user.id);
 
+            // Update on Cal.com if it's a Cal.com booking
+            if (meeting.calcom_booking_id) {
+                const startIso = new Date(newStartMs).toISOString();
+                const endIso = new Date(newEndMs).toISOString();
+                const calcom = require('./lib/calcom');
+                const calcomId = meeting.calcom_uid || meeting.calcom_booking_id;
+                await calcom.updateBookingTime(calcomId, startIso, endIso).catch(err => {
+                    console.error(`[RESCHEDULE] Failed to update booking time on Cal.com:`, err.message);
+                });
+            }
+
             if (wasActive) {
                 // Change status back to scheduled
                 await meetingsDb.updateMeetingStatus(meeting.id, 'scheduled');
