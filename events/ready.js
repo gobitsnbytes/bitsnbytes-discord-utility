@@ -10,6 +10,17 @@ module.exports = {
 		logger.init(client); // Re-init to trigger flush now that we are ready
 		logger.boot(`Logged in as ${client.user.tag}`);
 
+		// Leave unauthorized guilds on startup
+		const allowedGuildId = process.env.GUILD_ID || '1480617556292272260';
+		for (const [guildId, guild] of client.guilds.cache) {
+			if (guildId !== allowedGuildId) {
+				logger.warn(`[SECURITY] Main bot is in unauthorized guild: ${guild.name} (${guildId}). Leaving...`);
+				await guild.leave().catch(err => {
+					logger.error(`[SECURITY] Failed to leave unauthorized guild ${guildId}: ${err.message}`);
+				});
+			}
+		}
+
 		const rolesChannel = client.channels.cache.find(c => c.name === 'roles');
 		if (rolesChannel) {
 			logger.info(`Found #roles channel (${rolesChannel.id}). Starting setup...`);

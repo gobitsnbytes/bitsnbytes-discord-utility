@@ -104,10 +104,21 @@ client.once('ready', async () => {
 			logger.boot(`SYSTEM // PROTOCOL_ONLINE`, `**SYSTEM STATUS**\n${stats}`);
 		}
 
-		// Set cool presence/status activity for the main bot
+		// 🤖 Main bot booting up... Fueling on digital coffee and unresolved promises.
+		// 🌌 Re-routing the main power grid from Notion to our hopes and dreams.
 		try {
+			const statuses = [
+				{ name: 'Upstream sync (or lack thereof) // /help', type: ActivityType.Watching },
+				{ name: 'Catching bugs & throwing them at devs // /help', type: ActivityType.Playing },
+				{ name: 'Forks gossiping in the matrix // /help', type: ActivityType.Watching },
+				{ name: 'Devs weeping over merge conflicts // /help', type: ActivityType.Listening },
+				{ name: 'Staring contest with SQLite // /help', type: ActivityType.Competing },
+				{ name: 'Syncing Notion (and my existential dread) // /help', type: ActivityType.Playing },
+				{ name: 'Whispering sweet binaries to the mainframe // /help', type: ActivityType.Playing }
+			];
+			const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
 			client.user.setPresence({
-				activities: [{ name: 'Notion Sync // /help', type: ActivityType.Playing }],
+				activities: [randomStatus],
 				status: 'online'
 			});
 		} catch (presErr) {
@@ -116,10 +127,10 @@ client.once('ready', async () => {
 
 		// Set cool bio/About Me description for the main bot
 		try {
-			const bio = "BnB Bot — The internal operations layer for the Bits&Bytes Discord server. Bridging Discord interactions and Notion workspaces seamlessly.";
+			const bio = "Official operational sync bridge for GOBITSNBYTES FOUNDATION, a Section 8 Company limited by guarantee. Coordinates Upstream workflows and the distributed bitsbytes Network of local Forks, Nodes, and Maintainers. Integrates Discord interactions, performance health scoring, gamification, and meeting recording systems.";
 			if (client.application) {
 				await client.application.edit({ description: bio });
-				console.log(`[BOOT] Main bot application bio updated successfully.`);
+				console.log(`[BOOT] Main bot application bio updated successfully. Reality successfully refactored! 🚀`);
 			}
 		} catch (bioErr) {
 			console.warn(`[BOOT] Failed to update main bot application bio:`, bioErr.message);

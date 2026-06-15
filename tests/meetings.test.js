@@ -29,6 +29,18 @@ jest.mock('../config', () => ({
 	}
 }));
 
+let originalRecordingEnabled;
+beforeAll(() => {
+	originalRecordingEnabled = process.env.RECORDING_ENABLED;
+	process.env.RECORDING_ENABLED = 'false';
+});
+
+afterAll(() => {
+	process.env.RECORDING_ENABLED = originalRecordingEnabled;
+	db.close();
+	require('../lib/db').close();
+});
+
 describe('Meeting Scheduler Database Tests', () => {
 	const testMeetingId = 'meet_test_123';
 
