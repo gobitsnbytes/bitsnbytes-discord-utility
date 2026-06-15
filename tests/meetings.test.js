@@ -39,6 +39,7 @@ afterAll(() => {
 	process.env.RECORDING_ENABLED = originalRecordingEnabled;
 	db.close();
 	require('../lib/db').close();
+	require('../lib/listenerManager').closePool();
 });
 
 describe('Meeting Scheduler Database Tests', () => {

@@ -5,6 +5,7 @@ require('dotenv').config();
 const logger = require('./lib/logger');
 const { getGitInfo } = require('./lib/git');
 const db = require('./lib/db');
+const listenerManager = require('./lib/listenerManager');
 
 const client = new Client({
 	intents: [
@@ -134,6 +135,16 @@ client.once('ready', async () => {
 			}
 		} catch (bioErr) {
 			console.warn(`[BOOT] Failed to update main bot application bio:`, bioErr.message);
+		}
+
+		// Pre-warm the listener bots pool on boot
+		try {
+			if (listenerManager.hasListenerTokens()) {
+				logger.boot('Pre-warming listener bots pool...', null, false);
+				await listenerManager.initializePool();
+			}
+		} catch (poolErr) {
+			console.error(`[BOOT] Failed to pre-warm listener pool:`, poolErr.message);
 		}
 
 		// Self-healing / Startup Resumption

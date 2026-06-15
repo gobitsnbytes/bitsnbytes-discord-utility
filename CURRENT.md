@@ -808,6 +808,7 @@ bits-bytes-bot/
 | 2026-06-14 | **Gemini Connection Timeout Hardening** | Configured global `undici` dispatcher overrides (10m header / 20m body timeouts) and set explicit `httpOptions.timeout` (10m) on the `GoogleGenAI` client in `lib/transcriber.js` to prevent transcription of long meetings from dropping/failing with network `fetch failed` errors. |
 | 2026-06-15 | **Security Guards & Role Sync Overhaul** | Enforced that bot clients automatically leave unauthorized servers on boot and when invited. Integrated outreach and outreach-lead override roles, isolated parallel SQLite test execution via Jest worker IDs, and prevented database init race conditions. |
 | 2026-06-15 | **Corporate Identity & Rich Presence Integration** | Updated global About Me bios for main and listener bots matching GOBITSNBYTES FOUNDATION's legal identity (Section 8 Company, Forks, Nodes, Upstream). Implemented funny, amusing, and non-sensitive rich presence activities and comments to enhance community engagement without leaking internal statistics. |
+| 2026-06-15 | **Pre-Warmed Listener Bot Pool** | Refactored listener manager to log in and pre-warm all listener bots configured in `.env` at boot, keeping them online to showcase statuses and enable instant voice recording allocation without API handshake delay. |
 
 ---
 
