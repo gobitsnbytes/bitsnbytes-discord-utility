@@ -111,6 +111,14 @@ describe('Meeting Scheduler Database Tests', () => {
 		const meetingId = 'meet_ping_test';
 		const userId = 'user_ping_1';
 
+		await meetingsDb.createMeeting({
+			id: meetingId,
+			title: 'Ping Test Meeting',
+			scheduledTime: Date.now() + 60000,
+			locationType: 'discord_vc',
+			creatorId: 'creator'
+		});
+
 		let lastPing = await meetingsDb.getLastPingTime(meetingId, userId);
 		expect(lastPing).toBe(0);
 
