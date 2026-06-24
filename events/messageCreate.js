@@ -1,8 +1,10 @@
 const { Events, EmbedBuilder } = require('discord.js');
+const config = require('../config');
 
 const inviteRegex = /(discord\.(gg|io|me|li)\/.+|discordapp\.com\/invite\/.+)/i;
 
 // Self-promo and spam keywords (case-insensitive)
+// Keep these specific — avoid single-word triggers that staff use legitimately
 const spamKeywords = [
 	'join my server',
 	'check out my server',
@@ -14,20 +16,13 @@ const spamKeywords = [
 	'paypal.me',
 	'ko-fi.com',
 	'buy me a coffee',
-	'stipend',
-	'$',
 	'prize money',
-	'registration link',
-	'sign up now',
 	'win prize',
-	'hackathon registration',
-	'submit your project',
-	'register at',
 	'free v-bucks',
 	'free nitro',
 	'discord nitro',
 	'steam gift',
-	'gift card'
+	'gift card',
 ];
 
 // Allowed domains (whitelist)
@@ -44,18 +39,19 @@ const allowedDomains = [
 	'localhost',
 	'youtu.be',
 	'youtube.com',
-	'discord.com'
+	'discord.com',
+	'notion.so',
+	'gobitsnbytes.org',
+	'cal.gobitsnbytes.org',
 ];
 
-// Blocked URL patterns (external promo/spam)
+// Blocked URL patterns (external promo/spam) — only match full URLs, not message text
 const blockedUrlPatterns = [
 	/hackathon/i,
-	/ event /i,
-	/ registration/i,
-	/winners?/i,
-	/prize/i,
-	/stipend/i,
-	/certificate/i
+	/\/register/i,
+	/\/winners/i,
+	/\/prize/i,
+	/\/stipend/i,
 ];
 
 const userMessageCounts = new Map();
@@ -70,6 +66,24 @@ setInterval(() => {
 	}
 }, 60000);
 
+/**
+ * Check if a guild member is staff (has STAFF_ROLE_ID or is server admin).
+ * Staff are fully exempt from all automod actions.
+ */
+function isStaff(member) {
+	if (!member) return false;
+	if (member.permissions.has('Administrator')) return true;
+	const staffRoleId = process.env.STAFF_ROLE_ID || config.ROLE_IDS?.staff;
+	if (staffRoleId && member.roles.cache.has(staffRoleId)) return true;
+	// Also exempt exec leader and dep lead roles
+	const exemptRoles = [
+		'1506019032015310949', // exec_leader
+		'1506323726223016149', // dep_lead
+		process.env.STAFF_ROLE_ID,
+	].filter(Boolean);
+	return exemptRoles.some(id => member.roles.cache.has(id));
+}
+
 module.exports = {
 	name: Events.MessageCreate,
 	async execute(message) {
@@ -78,93 +92,82 @@ module.exports = {
 		const guild = message.guild;
 		if (!guild) return;
 
+		// Staff are fully exempt from all automod
+		if (isStaff(message.member)) return;
+
 		const opsChannel = guild.channels.cache.find(c => c.name === 'team-ops');
 
 		// 1. Block external Discord invite links
 		if (inviteRegex.test(message.content)) {
-			await message.delete();
+			await message.delete().catch(() => {});
 			await message.channel.send(`🚫 <@${message.author.id}>, external Discord invites are not allowed.`);
 			if (opsChannel) {
-				const logEmbed = new EmbedBuilder()
-					.setTitle('🛡️ Automod: Invite Link Filtered')
-					.addFields(
-						{ name: 'User', value: `${message.author.tag} (${message.author.id})` },
-						{ name: 'Channel', value: message.channel.toString() }
-					)
-					.setColor('#E74C3C');
-				await opsChannel.send({ embeds: [logEmbed] });
+				await opsChannel.send({
+					embeds: [new EmbedBuilder()
+						.setTitle('🛡️ Automod: Invite Link Filtered')
+						.addFields(
+							{ name: 'User', value: `${message.author.tag} (${message.author.id})` },
+							{ name: 'Channel', value: message.channel.toString() }
+						)
+						.setColor(config.COLORS.error)],
+				});
 			}
 			return;
 		}
 
-		// 1.5: Block self-promo and spam keywords
+		// 2. Block self-promo / spam keywords
 		const lowerContent = message.content.toLowerCase();
 		const matchedKeywords = spamKeywords.filter(keyword => lowerContent.includes(keyword.toLowerCase()));
-		
+
 		if (matchedKeywords.length > 0) {
-			await message.delete();
+			await message.delete().catch(() => {});
 			await message.channel.send(`🚫 <@${message.author.id}>, self-promotion and spam are not allowed.`);
 			if (opsChannel) {
-				const logEmbed = new EmbedBuilder()
-					.setTitle('🛡️ Automod: Self-Promo/Spam Filtered')
-					.addFields(
-						{ name: 'User', value: `${message.author.tag} (${message.author.id})` },
-						{ name: 'Channel', value: message.channel.toString() },
-						{ name: 'Matched', value: matchedKeywords.join(', ') }
-					)
-					.setColor('#E74C3C');
-				await opsChannel.send({ embeds: [logEmbed] });
-			}
-			return;
-		}
-
-		// 1.6: Block suspicious external links (hackathon, prizes, etc.)
-		const urlRegex = /(https?:\/\/[^\s]+)/g;
-		const urls = message.content.match(urlRegex) || [];
-		
-		for (const url of urls) {
-			// Check if URL is from allowed domains
-			const isAllowed = allowedDomains.some(domain => url.includes(domain));
-			if (isAllowed) continue;
-			
-			// Check if URL matches blocked patterns
-			const isBlocked = blockedUrlPatterns.some(pattern => pattern.test(url));
-			if (isBlocked) {
-				await message.delete();
-				await message.channel.send(`🚫 <@${message.author.id}>, links to external events/registrations are not allowed.`);
-				if (opsChannel) {
-					const logEmbed = new EmbedBuilder()
-						.setTitle('🛡️ Automod: Suspicious Link Filtered')
+				await opsChannel.send({
+					embeds: [new EmbedBuilder()
+						.setTitle('🛡️ Automod: Self-Promo/Spam Filtered')
 						.addFields(
 							{ name: 'User', value: `${message.author.tag} (${message.author.id})` },
 							{ name: 'Channel', value: message.channel.toString() },
-							{ name: 'URL', value: url.substring(0, 100) }
+							{ name: 'Matched', value: matchedKeywords.join(', ') }
 						)
-						.setColor('#E74C3C');
-					await opsChannel.send({ embeds: [logEmbed] });
+						.setColor(config.COLORS.error)],
+				});
+			}
+			return;
+		}
+
+		// 3. Block suspicious external links (hackathon promos, prize pages, etc.)
+		//    Only fires on URLs from non-whitelisted domains matching blocked patterns
+		const urlRegex = /(https?:\/\/[^\s]+)/g;
+		const urls = message.content.match(urlRegex) || [];
+
+		for (const url of urls) {
+			const isAllowed = allowedDomains.some(domain => url.includes(domain));
+			if (isAllowed) continue;
+
+			const isBlocked = blockedUrlPatterns.some(pattern => pattern.test(url));
+			if (isBlocked) {
+				await message.delete().catch(() => {});
+				await message.channel.send(`🚫 <@${message.author.id}>, links to external events/registrations are not allowed.`);
+				if (opsChannel) {
+					await opsChannel.send({
+						embeds: [new EmbedBuilder()
+							.setTitle('🛡️ Automod: Suspicious Link Filtered')
+							.addFields(
+								{ name: 'User', value: `${message.author.tag} (${message.author.id})` },
+								{ name: 'Channel', value: message.channel.toString() },
+								{ name: 'URL', value: url.substring(0, 100) }
+							)
+							.setColor(config.COLORS.error)],
+					});
 				}
 				return;
 			}
 		}
 
-		// 2. Block mass mentions (5+)
-		if (message.mentions.users.size >= 5) {
-			await message.delete();
-			await message.channel.send(`🚫 <@${message.author.id}>, your message was flagged for mass mentions.`);
-			if (opsChannel) {
-				const logEmbed = new EmbedBuilder()
-					.setTitle('🛡️ Automod: Mass Mentions Filtered')
-					.addFields(
-						{ name: 'User', value: `${message.author.tag} (${message.author.id})` },
-						{ name: 'Count', value: message.mentions.users.size.toString() }
-					)
-					.setColor('#E74C3C');
-				await opsChannel.send({ embeds: [logEmbed] });
-			}
-			return;
-		}
-
-		// 3. Spam filter: 5+ messages in 5 seconds
+		// 4. Spam filter: 6+ messages in 5 seconds → 10-minute timeout
+		//    (raised threshold from 5 to 6 to reduce false positives)
 		const now = Date.now();
 		const userStats = userMessageCounts.get(message.author.id) || { count: 0, timestamp: now };
 
@@ -176,21 +179,22 @@ module.exports = {
 		}
 		userMessageCounts.set(message.author.id, userStats);
 
-		if (userStats.count >= 5) {
+		if (userStats.count >= 6) {
 			try {
-				await message.member.timeout(10 * 60 * 1000, 'Spam detected'); // 10-minute timeout
+				await message.member.timeout(10 * 60 * 1000, 'Spam detected');
 				await message.channel.send(`🤐 <@${message.author.id}> has been timed out for 10 minutes due to spam.`);
 				if (opsChannel) {
-					const logEmbed = new EmbedBuilder()
-						.setTitle('🛡️ Automod: Spam Timeout')
-						.addFields(
-							{ name: 'User', value: `${message.author.tag} (${message.author.id})` }
-						)
-						.setColor('#E74C3C');
-					await opsChannel.send({ embeds: [logEmbed] });
+					await opsChannel.send({
+						embeds: [new EmbedBuilder()
+							.setTitle('🛡️ Automod: Spam Timeout')
+							.addFields(
+								{ name: 'User', value: `${message.author.tag} (${message.author.id})` }
+							)
+							.setColor(config.COLORS.error)],
+					});
 				}
 			} catch (e) {
-				console.log(`[AUTOMOD] Could not timeout user ${message.author.tag}. Maybe I'm missing permissions?`);
+				console.log(`[AUTOMOD] Could not timeout user ${message.author.tag}: ${e.message}`);
 			}
 		}
 	},
