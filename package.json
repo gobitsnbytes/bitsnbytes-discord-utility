@@ -4,8 +4,8 @@
   "description": "BnB Bot — The internal operations layer for the Bits&Bytes Discord server.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "test": "jest"
+    "start": "bun run index.js",
+    "test": "bun test"
   },
   "repository": {
     "type": "git",
@@ -41,14 +41,12 @@
   "devDependencies": {
     "jest": "^30.3.0"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "sqlite3",
-      "@discordjs/opus",
-      "sodium-native",
-      "node-crc",
-      "@google/genai",
-      "protobufjs"
-    ]
-  }
+  "trustedDependencies": [
+    "@discordjs/opus",
+    "@google/genai",
+    "node-crc",
+    "protobufjs",
+    "sodium-native",
+    "sqlite3"
+  ]
 }

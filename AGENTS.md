@@ -37,12 +37,12 @@ Key features include:
 ---
 
 ## 🛠️ Build, Run, and Test Commands
-*   **Package Manager**: **Always use `pnpm`**. Never run `npm` or `yarn` commands.
-*   **Install Dependencies**: `pnpm install`
-*   **Production Deployment Install**: `pnpm install --prod --frozen-lockfile` (ensures lockfile integrity).
-*   **Register Slash Commands**: `node deploy-commands.js` (Must be executed once before starting the bot to publish slash commands to Discord API, although client `ready` event also attempts auto-registration).
-*   **Start Local Dev Server / Bot**: `pnpm start` (Runs `node index.js`).
-*   **Execute Testing Suite**: `pnpm test` (Runs Jest tests). Ensure tests pass before proposing pull requests.
+*   **Package Manager & Runtime**: **Always use `bun`**. Never run `npm`, `yarn`, or `pnpm` commands.
+*   **Install Dependencies**: `bun install`
+*   **Production Deployment Install**: `bun install --production` (omits devDependencies).
+*   **Register Slash Commands**: `bun run deploy-commands.js` (Must be executed once before starting the bot to publish slash commands to Discord API, although client `ready` event also attempts auto-registration).
+*   **Start Local Dev Server / Bot**: `bun start` (Runs `bun run index.js`).
+*   **Execute Testing Suite**: `bun test` (Uses Bun's built-in Jest-compatible test runner). Ensure tests pass before proposing pull requests.
 
 ---
 

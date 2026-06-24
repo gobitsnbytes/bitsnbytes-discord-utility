@@ -18,6 +18,7 @@ jobs:
           script: |
             cd ${{ secrets.VPS_PATH }}
             git pull origin main
-            corepack enable
-            pnpm install --prod --frozen-lockfile
+            export BUN_INSTALL="$HOME/.bun"
+            export PATH="$BUN_INSTALL/bin:$PATH"
+            bun install --production
             sudo systemctl restart bnb-bot

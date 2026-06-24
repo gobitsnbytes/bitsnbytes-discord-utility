@@ -4,12 +4,15 @@ After=network.target
 
 [Service]
 Type=simple
-User=bot
+User=ubuntu
 WorkingDirectory=/opt/bits-bytes-bot
 EnvironmentFile=/opt/bits-bytes-bot/.env
-ExecStart=/usr/bin/node /opt/bits-bytes-bot/index.js
+Environment=BUN_INSTALL=/home/ubuntu/.bun
+ExecStart=/home/ubuntu/.bun/bin/bun run index.js
 Restart=always
 RestartSec=5
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

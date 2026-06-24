@@ -5,35 +5,42 @@ Internal operations bot for the Bits&Bytes Discord server. Manages the fork life
 ## Setup
 
 ```bash
-pnpm install
+bun install
 cp .env.example .env
 # Fill in your tokens in .env
-node deploy-commands.js   # Register slash commands (run once)
-pnpm start                # Start the bot
+bun run deploy-commands.js   # Register slash commands (run once)
+bun start                    # Start the bot
 ```
 
-## Minimal VPS Deploy
+## VPS Deploy
 
-Best for a small VPS with low RAM:
-
-1. Install Node.js 20+ and git on the VPS.
-2. Clone this repo into a folder like `/opt/bits-bytes-bot`.
+1. Install [Bun](https://bun.sh) and git on the VPS:
+   ```bash
+   curl -fsSL https://bun.sh/install | bash
+   sudo apt-get install -y ffmpeg git
+   ```
+2. Clone this repo into `/opt/bits-bytes-bot`.
 3. Create the `.env` file in that folder.
-4. Install dependencies:
-	```bash
-	corepack enable
-	pnpm install --prod --frozen-lockfile
-	```
+4. Install production dependencies:
+   ```bash
+   bun install --production
+   ```
 5. Register commands once:
-	```bash
-	node deploy-commands.js
-	```
-6. Start the bot with systemd using the sample service file in [`deploy/bnb-bot.service`](deploy/bnb-bot.service).
+   ```bash
+   bun run deploy-commands.js
+   ```
+6. Install and start the systemd service from [`deploy/bnb-bot.service`](deploy/bnb-bot.service):
+   ```bash
+   sudo cp deploy/bnb-bot.service /etc/systemd/system/bnb-bot.service
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now bnb-bot
+   ```
 
-Useful restart command:
+Useful commands:
 
 ```bash
-sudo systemctl restart bnb-bot
+sudo systemctl restart bnb-bot    # Restart the bot
+sudo journalctl -u bnb-bot -f     # Tail live logs
 ```
 
 ## CI/CD
@@ -89,7 +96,7 @@ Set these GitHub secrets:
 
 ## Web Scheduling Portal
 
-The bot hosts a web scheduling portal at `cal.gobnb.org` (or your configured `cal.gobitsnbytes.org` domain).
+The bot hosts a web scheduling portal at `cal.gobitsnbytes.org`.
 - **Forced Guest Authentication:** All guests are required to authenticate with Discord before reserving a time slot.
 - **Auto-Join Server:** Upon successful authentication, guests are automatically joined to the Bits&Bytes Discord server using the `guilds.join` scope.
 - **Automatic VC Access:** The bot auto-provisions a private temporary voice channel for the meeting and sets explicit permission overrides to allow the guest to view and connect.

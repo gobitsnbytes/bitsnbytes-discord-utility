@@ -1,7 +1,0 @@
-allowBuilds:
-  '@discordjs/opus': true
-  '@google/genai': true
-  node-crc: true
-  protobufjs: true
-  sqlite3: true
-  unrs-resolver: true
