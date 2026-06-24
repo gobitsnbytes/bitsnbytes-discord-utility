@@ -119,7 +119,7 @@ module.exports = {
 		tempDir: require('path').join(require('os').tmpdir(), 'bnb-recordings'),
 		maxConcurrentRecordings: 3,
 		minMeetingDurationMs: 60 * 1000,    // 1 minute minimum
-		postProcessingTimeoutMs: 35 * 60 * 1000, // 35 min max per pipeline (accounts for large FFmpeg merges and Gemini)
+		postProcessingTimeoutMs: 40 * 60 * 1000, // 40 min max per pipeline (accounts for remote FFmpeg merges and Gemini)
 		dmRateLimitMs: 1000,                // 1 DM per second
 		consent: {
 			audioEnglish: './assets/english.mp3',

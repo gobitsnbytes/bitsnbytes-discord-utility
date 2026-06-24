@@ -1,0 +1,90 @@
+name: Merge Audio
+
+on:
+  repository_dispatch:
+    types: [merge-audio]
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Prepare Workspace
+        run: |
+          mkdir -p /tmp/meeting-audio
+
+      - name: Download Segments
+        env:
+          PAYLOAD: ${{ toJson(github.event.client_payload) }}
+        run: |
+          python3 -c "
+          import json, os, urllib.request
+          payload = json.loads(os.environ['PAYLOAD'])
+          for i, seg in enumerate(payload['segments']):
+              print(f'Downloading segment {i}: {seg[\"url\"]}')
+              urllib.request.urlretrieve(seg['url'], f'/tmp/meeting-audio/segment_{i}.ogg')
+          "
+
+      - name: Generate Filter Graph
+        env:
+          PAYLOAD: ${{ toJson(github.event.client_payload) }}
+        run: |
+          python3 -c "
+          import json, os
+          payload = json.loads(os.environ['PAYLOAD'])
+          segments = payload['segments']
+          meeting_start_time = payload['meetingStartTime']
+          
+          inputs = []
+          filter_parts = []
+          for i, seg in enumerate(segments):
+              local_file = f'/tmp/meeting-audio/segment_{i}.ogg'
+              inputs.append(f'-i {local_file}')
+              
+              started_at = seg.get('startedAt', meeting_start_time)
+              delay = max(0, started_at - meeting_start_time)
+              filter_parts.append(f'[{i}]adelay={delay}|{delay}[a{i}]')
+          
+          mix_inputs = ''.join(f'[a{i}]' for i in range(len(segments)))
+          filter_parts.append(f'{mix_inputs}amix=inputs={len(segments)}:duration=longest:normalize=0[mixed]')
+          filter_parts.append('[mixed]aresample=16000[out]')
+          
+          filter_complex = '; '.join(filter_parts)
+          
+          with open('/tmp/meeting-audio/ffmpeg_inputs.txt', 'w') as f:
+              f.write(' '.join(inputs))
+          with open('/tmp/meeting-audio/ffmpeg_filter.txt', 'w') as f:
+              f.write(filter_complex)
+          "
+
+      - name: Run FFmpeg Merge
+        run: |
+          inputs=$(cat /tmp/meeting-audio/ffmpeg_inputs.txt)
+          filter=$(cat /tmp/meeting-audio/ffmpeg_filter.txt)
+          ffmpeg $inputs -filter_complex "$filter" -map "[out]" -c:a libopus -ar 16000 -b:a 48k -ac 1 -y /tmp/meeting-audio/merged_meeting.ogg
+
+      - name: Upload Merged File
+        run: |
+          curl -X PUT -T /tmp/meeting-audio/merged_meeting.ogg "${{ github.event.client_payload.mergedUploadUrl }}"
+
+      - name: Notify VPS Success
+        if: success()
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-Callback-Secret: ${{ secrets.FFMPEG_CALLBACK_SECRET }}" \
+            -d '{"meetingId": "${{ github.event.client_payload.meetingId }}", "status": "success", "mergedUrl": "${{ github.event.client_payload.mergedDownloadUrl }}"}' \
+            "${{ github.event.client_payload.callbackUrl }}"
+
+      - name: Notify VPS Failure
+        if: failure()
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-Callback-Secret: ${{ secrets.FFMPEG_CALLBACK_SECRET }}" \
+            -d '{"meetingId": "${{ github.event.client_payload.meetingId }}", "status": "failed", "error": "GitHub Actions merge workflow failed"}' \
+            "${{ github.event.client_payload.callbackUrl }}"

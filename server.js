@@ -1981,6 +1981,67 @@ function startWebServer(client) {
         return crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
     }
 
+    app.post('/webhook/ffmpeg-done', async (req, res) => {
+        const signature = req.headers['x-callback-secret'];
+        const callbackSecret = process.env.FFMPEG_CALLBACK_SECRET;
+
+        if (!callbackSecret) {
+            console.error('[WEBHOOK] FFMPEG_CALLBACK_SECRET is not configured in .env');
+            return res.status(500).send('Configuration Error');
+        }
+
+        if (!signature) {
+            console.warn('[WEBHOOK] Missing callback signature.');
+            return res.status(401).send('Unauthorized');
+        }
+
+        // Timing-safe comparison of the secret
+        const expectedBuffer = Buffer.from(callbackSecret, 'utf8');
+        const signatureBuffer = Buffer.from(signature, 'utf8');
+
+        if (expectedBuffer.length !== signatureBuffer.length || !crypto.timingSafeEqual(expectedBuffer, signatureBuffer)) {
+            console.warn('[WEBHOOK] Invalid callback signature.');
+            return res.status(401).send('Unauthorized');
+        }
+
+        const { meetingId, status, mergedUrl, error } = req.body;
+        console.log(`[WEBHOOK] Received remote FFmpeg callback for meeting ${meetingId}. Status: ${status}`);
+
+        // Respond immediately to prevent Actions runner timeout
+        res.status(200).json({ ok: true });
+
+        // Perform download asynchronously
+        const { mergeCallbackEmitter, meetingDirMap } = require('./lib/audioProcessor');
+        const callbackKey = `merge-done:${meetingId}`;
+
+        if (status === 'success') {
+            const state = meetingDirMap.get(meetingId);
+            if (!state || !state.meetingDir) {
+                console.error(`[WEBHOOK] No meetingDir mapping found for meeting ${meetingId}`);
+                mergeCallbackEmitter.emit(callbackKey, { success: false, error: 'No meeting directory registered' });
+                return;
+            }
+
+            const path = require('path');
+            const localPath = path.join(state.meetingDir, 'merged_meeting.ogg');
+            const { downloadFromPAR } = require('./lib/storageClient');
+
+            console.log(`[WEBHOOK] Downloading merged file from OCI: ${mergedUrl} -> ${localPath}`);
+            downloadFromPAR(mergedUrl, localPath)
+                .then(() => {
+                    console.log(`[WEBHOOK] Merged file downloaded successfully: ${localPath}`);
+                    mergeCallbackEmitter.emit(callbackKey, { success: true, localPath });
+                })
+                .catch((err) => {
+                    console.error(`[WEBHOOK] Failed to download merged file:`, err);
+                    mergeCallbackEmitter.emit(callbackKey, { success: false, error: `Download failed: ${err.message}` });
+                });
+        } else {
+            console.warn(`[WEBHOOK] Remote FFmpeg merge failed for meeting ${meetingId}: ${error}`);
+            mergeCallbackEmitter.emit(callbackKey, { success: false, error: error || 'GitHub Actions workflow failed' });
+        }
+    });
+
     app.post('/webhooks/calcom', async (req, res) => {
         const signature = req.headers['x-cal-signature-256'];
         
