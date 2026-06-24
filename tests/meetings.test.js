@@ -465,3 +465,94 @@ describe('meetingsDb.removeAttendee', () => {
 		expect(meeting.attendees.map(a => a.discordId)).not.toContain('user_to_remove');
 	});
 });
+
+describe('Slash Command: /meet-stop', () => {
+	let mockInteraction;
+	let mockMember;
+	let mockGuild;
+	const { execute } = require('../commands/meet-stop');
+
+	beforeEach(() => {
+		mockMember = {
+			roles: {
+				cache: {
+					has: jest.fn().mockReturnValue(false),
+				},
+			},
+			permissions: {
+				has: jest.fn().mockReturnValue(false),
+			},
+			voice: {
+				channelId: 'voice_chan_999'
+			}
+		};
+
+		mockGuild = {
+			id: 'guild_123',
+			members: {
+				fetch: jest.fn().mockResolvedValue(mockMember),
+			},
+			channels: {
+				cache: {
+					get: jest.fn().mockReturnValue({
+						delete: jest.fn().mockResolvedValue(true),
+						id: 'voice_chan_999'
+					}),
+					find: jest.fn().mockReturnValue({
+						send: jest.fn().mockResolvedValue(true)
+					})
+				}
+			}
+		};
+
+		mockInteraction = {
+			user: { id: 'user_123', tag: 'user#1234' },
+			guild: mockGuild,
+			reply: jest.fn().mockResolvedValue(true),
+			deferReply: jest.fn().mockResolvedValue(true),
+			editReply: jest.fn().mockResolvedValue(true),
+			options: {
+				getString: jest.fn().mockReturnValue(null),
+			},
+			client: {
+				user: { id: 'bot_id' }
+			}
+		};
+	});
+
+	test('should deny access to unauthorized users', async () => {
+		await execute(mockInteraction);
+		expect(mockInteraction.reply).toHaveBeenCalled();
+		const replyArg = mockInteraction.reply.mock.calls[0][0];
+		expect(replyArg.embeds[0].data.title).toContain('PROTOCOL_UNAUTHORIZED');
+	});
+
+	test('should stop active meeting successfully if authorized', async () => {
+		// Mock authorized role
+		mockMember.roles.cache.has.mockImplementation((roleId) => roleId === '1480620981587279993');
+
+		// Create a mock meeting in DB
+		const meetingId = 'meet_stop_test';
+		await meetingsDb.createMeeting({
+			id: meetingId,
+			title: 'Stop Test Meeting',
+			scheduledTime: Date.now() + 60000,
+			locationType: 'discord_vc',
+			creatorId: 'user_123',
+			status: 'active'
+		});
+		await meetingsDb.setTempChannelId(meetingId, 'voice_chan_999');
+
+		mockInteraction.options.getString.mockReturnValue(meetingId);
+
+		await execute(mockInteraction);
+
+		expect(mockInteraction.deferReply).toHaveBeenCalled();
+		expect(mockInteraction.editReply).toHaveBeenCalledWith(expect.objectContaining({
+			content: expect.stringContaining('stopped successfully')
+		}));
+
+		const retrieved = await meetingsDb.getMeeting(meetingId);
+		expect(retrieved.status).toBe('completed');
+	});
+});

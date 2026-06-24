@@ -87,6 +87,20 @@ module.exports = {
 					activeCleanupTimeouts.delete(oldChannelId);
 				}
 
+				// Fetch meeting to calculate dynamic cleanup delay
+				// (Channel must be empty for at least 2 minutes AND past the 5-minute meeting grace period)
+				let cleanupDelay = 2 * 60 * 1000;
+				try {
+					const meeting = await meetingsDb.findMeetingByTempChannel(oldChannelId);
+					if (meeting && meeting.status === 'active') {
+						const startTime = meeting.activated_at || meeting.scheduled_time;
+						const gracePeriodRemaining = (startTime + 5 * 60 * 1000) - Date.now();
+						cleanupDelay = Math.max(cleanupDelay, gracePeriodRemaining);
+					}
+				} catch (err) {
+					console.error('[MEETING] Error calculating dynamic VC cleanup delay:', err.message);
+				}
+
 				const timeout = setTimeout(async () => {
 					activeCleanupTimeouts.delete(oldChannelId);
 					try {
@@ -119,7 +133,7 @@ module.exports = {
 								return;
 							}
 
-							console.log(`[MEETING] Temporary VC ${channel.name} (${oldChannelId}) has been empty for 2 minutes. Initiating cleanup...`);
+							console.log(`[MEETING] Temporary VC ${channel.name} (${oldChannelId}) has met cleanup criteria after ${Math.round(cleanupDelay / 1000)}s. Initiating cleanup...`);
 
 							// Stop recording and queue transcription BEFORE deleting the channel
 							if (process.env.RECORDING_ENABLED === 'true') {
@@ -149,10 +163,10 @@ module.exports = {
 					} catch (error) {
 						console.error('[MEETING ERROR] Error during debounced VC cleanup:', error);
 					}
-				}, 2 * 60 * 1000); // 2-minute grace period
+				}, cleanupDelay);
 
 				activeCleanupTimeouts.set(oldChannelId, timeout);
-				console.log(`[MEETING] Temporary VC ${oldChannel.name} (${oldChannelId}) is now empty. Cleanup scheduled in 2 minutes.`);
+				console.log(`[MEETING] Temporary VC ${oldChannel.name} (${oldChannelId}) is now empty. Cleanup scheduled in ${Math.round(cleanupDelay / 1000)} seconds.`);
 			}
 		}
 	}

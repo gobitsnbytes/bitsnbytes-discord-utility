@@ -110,6 +110,7 @@ module.exports = {
 		'meet-schedule': true,     // Ephemeral - meeting scheduler
 		'meet-transcript': true,   // Ephemeral - transcript retrieval
 		'meet-start': true,        // Ephemeral - start meeting manually
+		'meet-stop': true,         // Ephemeral - stop meeting manually
 		'meet-reschedule': true,   // Ephemeral - reschedule meeting
 		'ts-off': true             // Ephemeral - secret emergency recording abort
 	},
@@ -132,7 +133,7 @@ module.exports = {
 		supportedLanguages: ['English', 'Hindi', 'Hinglish'],
 		maxRetries: 3,
 		retryBackoffMs: 2000,
-		// gemini-2.5-flash may take longer for audio analysis on lengthy meetings
+		// gemini-3.5-flash may take longer for audio analysis on lengthy meetings
 		transcriptionTimeoutMs: 30 * 60 * 1000,  // 30 min cap per Gemini call
 	}
 };
