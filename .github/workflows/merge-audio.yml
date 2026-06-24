@@ -67,24 +67,22 @@ jobs:
           filter=$(cat /tmp/meeting-audio/ffmpeg_filter.txt)
           ffmpeg $inputs -filter_complex "$filter" -map "[out]" -c:a libopus -ar 16000 -b:a 48k -ac 1 -y /tmp/meeting-audio/merged_meeting.ogg
 
-      - name: Upload Merged File
-        run: |
-          curl -X PUT -T /tmp/meeting-audio/merged_meeting.ogg "${{ github.event.client_payload.mergedUploadUrl }}"
-
-      - name: Notify VPS Success
+      - name: Upload Merged Audio & Notify Success
         if: success()
         run: |
-          curl -X POST \
-            -H "Content-Type: application/json" \
+          curl -X PUT \
             -H "X-Callback-Secret: ${{ secrets.FFMPEG_CALLBACK_SECRET }}" \
-            -d '{"meetingId": "${{ github.event.client_payload.meetingId }}", "status": "success", "mergedUrl": "${{ github.event.client_payload.mergedDownloadUrl }}"}' \
+            -H "X-Meeting-Id: ${{ github.event.client_payload.meetingId }}" \
+            -H "X-Status: success" \
+            --data-binary @/tmp/meeting-audio/merged_meeting.ogg \
             "${{ github.event.client_payload.callbackUrl }}"
 
       - name: Notify VPS Failure
         if: failure()
         run: |
-          curl -X POST \
-            -H "Content-Type: application/json" \
+          curl -X PUT \
             -H "X-Callback-Secret: ${{ secrets.FFMPEG_CALLBACK_SECRET }}" \
-            -d '{"meetingId": "${{ github.event.client_payload.meetingId }}", "status": "failed", "error": "GitHub Actions merge workflow failed"}' \
+            -H "X-Meeting-Id: ${{ github.event.client_payload.meetingId }}" \
+            -H "X-Status: failed" \
+            -H "X-Error: GitHub Actions merge workflow failed" \
             "${{ github.event.client_payload.callbackUrl }}"

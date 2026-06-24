@@ -715,7 +715,6 @@ VAPID_PRIVATE_KEY=       # VAPID private key
 VAPID_SUBJECT=mailto:hello@gobitsnbytes.org
 
 # FFmpeg Audio Offload (GitHub Actions)
-OCI_PAR_BASE_URL=         # Pre-Authenticated Request base URL for bnb-meeting-audio-temp bucket
 GITHUB_DISPATCH_TOKEN=    # Fine-grained PAT with Actions write scope
 FFMPEG_CALLBACK_SECRET=   # 32-char random shared secret for webhook validation
 VPS_BASE_URL=             # Public HTTPS URL of the VPS (e.g., https://cal.gobitsnbytes.org)
@@ -844,7 +843,7 @@ bits-bytes-bot/
 | 2026-06-15 | **Security Guards & Role Sync Overhaul** | Enforced that bot clients automatically leave unauthorized servers on boot and when invited. Integrated outreach and outreach-lead override roles, isolated parallel SQLite test execution via Jest worker IDs, and prevented database init race conditions. |
 | 2026-06-15 | **Corporate Identity & Rich Presence Integration** | Updated global About Me bios for main and listener bots matching GOBITSNBYTES FOUNDATION's legal identity (Section 8 Company, Forks, Nodes, Upstream). Implemented funny, amusing, and non-sensitive rich presence activities and comments to enhance community engagement without leaking internal statistics. |
 | 2026-06-15 | **Pre-Warmed Listener Bot Pool** | Refactored listener manager to log in and pre-warm all listener bots configured in `.env` at boot, keeping them online to showcase statuses and enable instant voice recording allocation without API handshake delay. |
-| 2026-06-25 | **FFmpeg Audio Merge Offload** | Offloaded memory-intensive FFmpeg audio merging to GitHub Actions. Raw segments are uploaded to OCI Object Storage via Pre-Authenticated Requests (PAR), merged via remote FFmpeg run, callback received at `/webhook/ffmpeg-done`, and cleaned up, preventing VPS OOM crashes. |
+| 2026-06-25 | **FFmpeg Audio Merge Offload** | Offloaded memory-intensive FFmpeg audio merging to GitHub Actions. Raw segments are served securely from the VPS, merged via remote FFmpeg on the Actions runner, and PUT directly back to `/webhook/ffmpeg-done`, preventing VPS OOM crashes without any cloud storage (OCI) dependencies. |
 
 ---
 

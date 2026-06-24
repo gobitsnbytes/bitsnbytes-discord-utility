@@ -142,6 +142,8 @@ function startWebServer(client) {
                 req.rawBody = Buffer.concat(chunks).toString('utf8');
                 next();
             });
+        } else if (req.url.startsWith('/webhook/ffmpeg-done') || req.url.startsWith('/temp-audio/')) {
+            next();
         } else {
             express.json({ limit: '100kb' })(req, res, next);
         }
@@ -1981,7 +1983,36 @@ function startWebServer(client) {
         return crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
     }
 
-    app.post('/webhook/ffmpeg-done', async (req, res) => {
+    // Secure segment server for remote audio merge offload (no cloud storage)
+    app.get('/temp-audio/:meetingId/:filename', (req, res) => {
+        const { meetingId, filename } = req.params;
+        const token = req.query.token;
+        const callbackSecret = process.env.FFMPEG_CALLBACK_SECRET;
+
+        if (!callbackSecret || token !== callbackSecret) {
+            console.warn('[TEMP_AUDIO] Unauthorized access attempt to temp audio segments.');
+            return res.status(401).send('Unauthorized');
+        }
+
+        // Prevent path traversal
+        if (meetingId.includes('..') || filename.includes('..')) {
+            return res.status(400).send('Bad Request');
+        }
+
+        const path = require('path');
+        const fs = require('fs');
+        const tempDir = config.RECORDING?.tempDir || path.join(require('os').tmpdir(), 'bnb-recordings');
+        const filePath = path.join(tempDir, meetingId, filename);
+
+        if (fs.existsSync(filePath)) {
+            res.sendFile(filePath);
+        } else {
+            res.status(404).send('Not Found');
+        }
+    });
+
+    // Callback receiver for remote FFmpeg audio merge (no cloud storage)
+    app.put('/webhook/ffmpeg-done', (req, res) => {
         const signature = req.headers['x-callback-secret'];
         const callbackSecret = process.env.FFMPEG_CALLBACK_SECRET;
 
@@ -2004,13 +2035,17 @@ function startWebServer(client) {
             return res.status(401).send('Unauthorized');
         }
 
-        const { meetingId, status, mergedUrl, error } = req.body;
+        const meetingId = req.headers['x-meeting-id'];
+        const status = req.headers['x-status'] || 'success';
+        const error = req.headers['x-error'] || 'Unknown error';
+
+        if (!meetingId) {
+            console.warn('[WEBHOOK] Missing x-meeting-id header.');
+            return res.status(400).send('Bad Request');
+        }
+
         console.log(`[WEBHOOK] Received remote FFmpeg callback for meeting ${meetingId}. Status: ${status}`);
 
-        // Respond immediately to prevent Actions runner timeout
-        res.status(200).json({ ok: true });
-
-        // Perform download asynchronously
         const { mergeCallbackEmitter, meetingDirMap } = require('./lib/audioProcessor');
         const callbackKey = `merge-done:${meetingId}`;
 
@@ -2018,26 +2053,43 @@ function startWebServer(client) {
             const state = meetingDirMap.get(meetingId);
             if (!state || !state.meetingDir) {
                 console.error(`[WEBHOOK] No meetingDir mapping found for meeting ${meetingId}`);
+                res.status(400).send('No meeting directory registered');
                 mergeCallbackEmitter.emit(callbackKey, { success: false, error: 'No meeting directory registered' });
                 return;
             }
 
             const path = require('path');
+            const fs = require('fs');
             const localPath = path.join(state.meetingDir, 'merged_meeting.ogg');
-            const { downloadFromPAR } = require('./lib/storageClient');
+            
+            console.log(`[WEBHOOK] Streaming merged file directly to local disk: ${localPath}`);
+            const fileStream = fs.createWriteStream(localPath);
 
-            console.log(`[WEBHOOK] Downloading merged file from OCI: ${mergedUrl} -> ${localPath}`);
-            downloadFromPAR(mergedUrl, localPath)
-                .then(() => {
-                    console.log(`[WEBHOOK] Merged file downloaded successfully: ${localPath}`);
-                    mergeCallbackEmitter.emit(callbackKey, { success: true, localPath });
-                })
-                .catch((err) => {
-                    console.error(`[WEBHOOK] Failed to download merged file:`, err);
-                    mergeCallbackEmitter.emit(callbackKey, { success: false, error: `Download failed: ${err.message}` });
-                });
+            req.pipe(fileStream);
+
+            fileStream.on('finish', () => {
+                fileStream.close();
+                console.log(`[WEBHOOK] Merged file successfully saved locally: ${localPath}`);
+                res.status(200).json({ ok: true });
+                mergeCallbackEmitter.emit(callbackKey, { success: true, localPath });
+            });
+
+            req.on('error', (err) => {
+                fileStream.close();
+                fs.unlink(localPath, () => {});
+                console.error(`[WEBHOOK] Stream error while receiving merged file:`, err);
+                res.status(500).send('Stream error');
+                mergeCallbackEmitter.emit(callbackKey, { success: false, error: `Upload stream error: ${err.message}` });
+            });
+
+            fileStream.on('error', (err) => {
+                console.error(`[WEBHOOK] File stream error while writing merged file:`, err);
+                res.status(500).send('Write error');
+                mergeCallbackEmitter.emit(callbackKey, { success: false, error: `File write error: ${err.message}` });
+            });
         } else {
             console.warn(`[WEBHOOK] Remote FFmpeg merge failed for meeting ${meetingId}: ${error}`);
+            res.status(200).json({ ok: true });
             mergeCallbackEmitter.emit(callbackKey, { success: false, error: error || 'GitHub Actions workflow failed' });
         }
     });
