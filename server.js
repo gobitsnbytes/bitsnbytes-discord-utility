@@ -405,7 +405,31 @@ function startWebServer(client) {
                         [userData.email || null, cityRoleId || null, userData.avatar || null, userData.id]
                     );
                 }
+
+                // Sync to Motherboard (Neon PostgreSQL) so Chrono portal gets live data
+                if (process.env.NODE_ENV !== 'test') {
+                    const localRecord = await db.get(`SELECT * FROM user_availability WHERE discord_id = ?`, [userData.id]);
+                    if (localRecord) {
+                        const { callMotherboard } = require('./lib/motherboardApi');
+                        callMotherboard('POST', '/api/meetings/availability', userData.id, {
+                            discord_id: localRecord.discord_id,
+                            username: localRecord.username,
+                            email: localRecord.email || null,
+                            timezone: localRecord.timezone || 'Asia/Kolkata',
+                            weekly_hours: localRecord.weekly_hours || null,
+                            booking_link: localRecord.booking_link || null,
+                            title: localRecord.title || null,
+                            description: localRecord.description || null,
+                            calcom_event_type_id: localRecord.calcom_event_type_id || null,
+                            associated_role_id: localRecord.associated_role_id || null,
+                            avatar: localRecord.avatar || null,
+                        }).catch(err => {
+                            console.warn('[AUTH_CALLBACK] Motherboard availability sync failed (non-fatal):', err.message);
+                        });
+                    }
+                }
             }
+
 
             // If user has an email, find meetings where they were invited as an external guest
             if (userData.email) {
@@ -503,14 +527,27 @@ function startWebServer(client) {
 
     app.get('/dashboard', checkPageAuth, async (req, res) => {
         const userId = req.user.id;
-        // Verify user holds contributor role (by checking user_availability presence)
-        const isHost = await db.get(`SELECT 1 FROM user_availability WHERE discord_id = ?`, [userId]);
+        // Verify user holds contributor role: check local SQLite first, then Motherboard
+        let isHost = await db.get(`SELECT 1 FROM user_availability WHERE discord_id = ?`, [userId]);
+        if (!isHost && process.env.NODE_ENV !== 'test') {
+            try {
+                const motherboardUrl = process.env.MOTHERBOARD_API_URL || 'http://localhost:8000';
+                const mbRes = await fetch(`${motherboardUrl}/api/meetings/public/hosts`);
+                if (mbRes.ok) {
+                    const hosts = await mbRes.json();
+                    isHost = hosts.some(h => h.discord_id === userId) ? { discord_id: userId } : null;
+                }
+            } catch (e) {
+                console.warn('[DASHBOARD] Motherboard host check failed, using SQLite result:', e.message);
+            }
+        }
         if (isHost) {
             return res.sendFile(path.join(__dirname, 'public/dashboard.html'));
         } else {
             return res.status(403).send('Access Denied: You must be a member of the Bits&Bytes Discord server and hold the "contributor" role to view the dashboard.');
         }
     });
+
 
     // ============================================
     // API ENDPOINTS
@@ -702,14 +739,30 @@ function startWebServer(client) {
 
     app.get('/api/users', async (req, res) => {
         try {
-            const users = await db.all(`SELECT discord_id, username, title, booking_link, description, timezone, weekly_hours, calcom_event_type_id, associated_role_id, avatar FROM user_availability WHERE booking_link IS NOT NULL`);
-            const resolvedUsers = await Promise.all(users.map(async (u) => {
-                const { role, cityName } = await resolveMemberRoleAndCity(u.discord_id, u.associated_role_id);
-                return {
-                    ...u,
-                    role,
-                    cityName
-                };
+            // In test mode, fall back to local SQLite for offline test isolation
+            if (process.env.NODE_ENV === 'test') {
+                const users = await db.all(`SELECT discord_id, username, title, booking_link, description, timezone, weekly_hours, calcom_event_type_id, associated_role_id, avatar FROM user_availability WHERE booking_link IS NOT NULL`);
+                const resolvedUsers = await Promise.all(users.map(async (u) => {
+                    const { role, cityName } = await resolveMemberRoleAndCity(u.discord_id, u.associated_role_id);
+                    return { ...u, role, cityName };
+                }));
+                return res.json(resolvedUsers);
+            }
+
+            // Production: proxy to Motherboard public hosts endpoint
+            const motherboardUrl = process.env.MOTHERBOARD_API_URL || 'http://localhost:8000';
+            const mbRes = await fetch(`${motherboardUrl}/api/meetings/public/hosts`);
+            if (!mbRes.ok) {
+                const errText = await mbRes.text();
+                console.error('[API_USERS] Motherboard responded with error:', mbRes.status, errText);
+                return res.status(502).json({ error: 'Failed to retrieve team schedules from Motherboard' });
+            }
+            const hosts = await mbRes.json();
+
+            // Enrich each host with Discord role metadata (exec_leader, dep_lead, etc.)
+            const resolvedUsers = await Promise.all(hosts.map(async (u) => {
+                const { role, cityName } = await resolveMemberRoleAndCity(u.discord_id, u.associated_role_id).catch(() => ({ role: 'contributor', cityName: null }));
+                return { ...u, role, cityName };
             }));
             res.json(resolvedUsers);
         } catch (err) {
@@ -717,6 +770,7 @@ function startWebServer(client) {
             res.status(500).json({ error: 'Database query failed' });
         }
     });
+
 
     // Returns the list of active fork city slugs for the scope selector UI
     app.get('/api/forks', async (req, res) => {
@@ -854,7 +908,23 @@ function startWebServer(client) {
         }
 
         try {
-            const primaryHost = await db.get(`SELECT * FROM user_availability WHERE booking_link = ?`, [bookingLink]);
+            const motherboardUrl = process.env.MOTHERBOARD_API_URL || 'http://localhost:8000';
+
+            // Helper to resolve a host profile by booking_link slug
+            async function resolveHostByLink(link) {
+                if (process.env.NODE_ENV === 'test') {
+                    return db.get(`SELECT * FROM user_availability WHERE booking_link = ?`, [link]);
+                }
+                try {
+                    const mbRes = await fetch(`${motherboardUrl}/api/meetings/public/availability/${encodeURIComponent(link)}`);
+                    if (mbRes.ok) return await mbRes.json();
+                } catch (e) {
+                    console.warn('[AVAILABILITY_API] Motherboard lookup failed, falling back to SQLite:', e.message);
+                }
+                return db.get(`SELECT * FROM user_availability WHERE booking_link = ?`, [link]);
+            }
+
+            const primaryHost = await resolveHostByLink(bookingLink);
             if (!primaryHost) {
                 return res.status(404).json({ error: 'Primary host not found' });
             }
@@ -865,7 +935,7 @@ function startWebServer(client) {
             // Fetch and intersect additional host slots
             for (const handle of additionalHosts) {
                 if (!handle.trim()) continue;
-                const addHost = await db.get(`SELECT * FROM user_availability WHERE booking_link = ?`, [handle.trim()]);
+                const addHost = await resolveHostByLink(handle.trim());
                 if (addHost) {
                     const hostSlots = await getHostFreeSlotsUTC(addHost, date, duration, primaryHost.timezone);
                     // Intersect
@@ -900,6 +970,7 @@ function startWebServer(client) {
             res.status(500).json({ error: 'Failed to calculate slots' });
         }
     });
+
 
     // ============================================
     // MEETING PAGE ROUTES
