@@ -2,9 +2,6 @@
  * Unit tests for lib/auth.js
  */
 
-const { isAuthorizedForCity, isAuthorizedForForkId, getCoreAdminRoles, getCoreAdminAndParentRoles } = require('../lib/auth');
-const notion = require('../lib/notion');
-
 // Mock notion module
 jest.mock('../lib/notion', () => {
 	const pagesRetrieve = jest.fn();
@@ -19,6 +16,9 @@ jest.mock('../lib/notion', () => {
 		retrievePage: jest.fn().mockImplementation(async (pageId) => pagesRetrieve({ page_id: pageId })),
 	};
 });
+
+const { isAuthorizedForCity, isAuthorizedForForkId, getCoreAdminRoles, getCoreAdminAndParentRoles } = require('../lib/auth');
+const notion = require('../lib/notion');
 
 describe('Auth Layer Tests', () => {
 	let mockUser;

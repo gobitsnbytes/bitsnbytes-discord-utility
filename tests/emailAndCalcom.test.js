@@ -1,16 +1,16 @@
-const icsGenerator = require('../lib/icsGenerator');
-const emailTemplates = require('../lib/emailTemplates');
-const mailer = require('../lib/mailer');
-const calcom = require('../lib/calcom');
-const calcomWebhook = require('../lib/calcomWebhook');
-const meetingsDb = require('../lib/meetingsDb');
-
 // Mock nodemailer
 jest.mock('nodemailer', () => ({
 	createTransport: jest.fn().mockReturnValue({
 		sendMail: jest.fn().mockResolvedValue({ messageId: 'test-message-id' })
 	})
 }));
+
+const icsGenerator = require('../lib/icsGenerator');
+const emailTemplates = require('../lib/emailTemplates');
+const mailer = require('../lib/mailer');
+const calcom = require('../lib/calcom');
+const calcomWebhook = require('../lib/calcomWebhook');
+const meetingsDb = require('../lib/meetingsDb');
 
 // Mock fetch for Cal.com API
 global.fetch = jest.fn();

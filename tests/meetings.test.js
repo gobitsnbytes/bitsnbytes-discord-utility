@@ -5,29 +5,43 @@ const path = require('path');
 const dbPath = require('../lib/db').dbPath;
 const db = new sqlite3.Database(dbPath);
 
-// Mock config
-jest.mock('../config', () => ({
-	COLORS: {
-		primary: '#00F2FF',
-		success: '#00FF95',
-		warning: '#FFCC00',
-		error: '#FF0055',
-	},
-	EMOJIS: {
-		calendar: '📆',
-		reminder: '🔔',
-		error: '❌',
-	},
-	BRANDING: {
-		footerText: 'TEST_FOOTER',
-	},
-	ROLE_IDS: {
-		contributor: 'contrib_role_123'
-	},
-	PRIVACY: {
-		'meet-schedule': true
-	}
+jest.mock('../lib/motherboardApi', () => ({
+	callMotherboard: jest.fn()
 }));
+const { callMotherboard } = require('../lib/motherboardApi');
+
+// Mock config
+jest.mock('../config', () => {
+	const original = jest.requireActual('../config');
+	return {
+		...original,
+		COLORS: {
+			...original.COLORS,
+			primary: '#00F2FF',
+			success: '#00FF95',
+			warning: '#FFCC00',
+			error: '#FF0055',
+		},
+		EMOJIS: {
+			...original.EMOJIS,
+			calendar: '📆',
+			reminder: '🔔',
+			error: '❌',
+		},
+		BRANDING: {
+			...original.BRANDING,
+			footerText: 'TEST_FOOTER',
+		},
+		ROLE_IDS: {
+			...original.ROLE_IDS,
+			contributor: 'contrib_role_123'
+		},
+		PRIVACY: {
+			...original.PRIVACY,
+			'meet-schedule': true
+		}
+	};
+});
 
 let originalRecordingEnabled;
 beforeAll(() => {
@@ -172,18 +186,34 @@ describe('Slash Command: /meet-schedule Authorization', () => {
 			permissions: {
 				has: jest.fn().mockReturnValue(false),
 			},
+			user: {
+				bot: false
+			},
+			send: jest.fn().mockResolvedValue(true)
 		};
 
 		mockGuild = {
+			id: 'guild_123',
 			members: {
 				fetch: jest.fn().mockResolvedValue(mockMember),
+			},
+			roles: {
+				everyone: { id: 'everyone_role_id' },
+				cache: {
+					get: jest.fn().mockImplementation((id) => {
+						return { id, name: id === '1509256369994203146' ? 'Staff' : 'Some Role' };
+					}),
+					find: jest.fn().mockReturnValue({ id: 'contrib_role_id' })
+				}
 			},
 			channels: {
 				cache: {
 					find: jest.fn().mockReturnValue({
+						id: 'events_category_id',
 						send: jest.fn().mockResolvedValue(true),
 					}),
 				},
+				create: jest.fn().mockResolvedValue({ id: 'temp_vc_chan_123', name: 'Temp VC' }),
 			},
 		};
 
@@ -201,6 +231,31 @@ describe('Slash Command: /meet-schedule Authorization', () => {
 				getInteger: jest.fn(),
 			},
 		};
+
+		callMotherboard.mockImplementation((method, path, userId, body) => {
+			if (method === 'POST' && path === '/api/meetings/schedule') {
+				return Promise.resolve({
+					id: 'meet_test_123',
+					title: body.title || 'Test Meeting',
+					description: body.description || '',
+					scheduled_time: body.scheduled_time || Date.now(),
+					duration_minutes: body.duration_minutes || 30,
+					location_type: body.location_type || 'discord_vc',
+					location_details: body.location_details || '',
+					creator_id: userId,
+					attendees: (body.invitees || []).map(inv => ({ attendee_type: inv.type, discord_id: inv.id })),
+					external_emails: (body.external_emails || []).join(','),
+					notes: body.notes || '',
+					scope: body.scope || 'invite'
+				});
+			}
+			if (method === 'PATCH' && path.startsWith('/api/meetings/')) {
+				return Promise.resolve({
+					success: true
+				});
+			}
+			return Promise.reject(new Error(`Unexpected callMotherboard in test: ${method} ${path}`));
+		});
 	});
 
 	test('should deny access if member does not have authorized roles or admin', async () => {
@@ -283,7 +338,11 @@ describe('Slash Command: /meet-start', () => {
 			},
 			voice: {
 				channelId: 'voice_chan_999'
-			}
+			},
+			user: {
+				bot: false
+			},
+			send: jest.fn().mockResolvedValue(true)
 		};
 
 		mockGuild = {
@@ -292,10 +351,24 @@ describe('Slash Command: /meet-start', () => {
 				fetch: jest.fn().mockResolvedValue(mockMember),
 			},
 			channels: {
+				fetch: jest.fn().mockImplementation(async (id) => {
+					if (id === '1508037242092912650') {
+						return {
+							id: '1508037242092912650',
+							send: jest.fn().mockResolvedValue(true)
+						};
+					}
+					return null;
+				}),
 				cache: {
-					get: jest.fn().mockReturnValue({
-						members: new Map(),
-						id: 'voice_chan_999'
+					get: jest.fn().mockImplementation((id) => {
+						if (id === 'voice_chan_999') {
+							return {
+								members: new Map(),
+								id: 'voice_chan_999'
+							};
+						}
+						return null;
 					}),
 					find: jest.fn().mockReturnValue({
 						send: jest.fn().mockResolvedValue(true)
@@ -317,6 +390,45 @@ describe('Slash Command: /meet-start', () => {
 				user: { id: 'bot_id' }
 			}
 		};
+
+		callMotherboard.mockImplementation((method, path, userId, body) => {
+			const meetingId = 'meet_start_test';
+			if (method === 'GET' && path === `/api/meetings/${meetingId}`) {
+				return Promise.resolve({
+					id: meetingId,
+					title: 'Start Test Meeting',
+					scheduled_time: Date.now() + 60000,
+					duration_minutes: 30,
+					location_type: 'discord_vc',
+					location_details: '',
+					creator_id: 'user_123',
+					status: 'scheduled',
+					attendees: [
+						{ attendee_type: 'user', discord_id: 'user_invite_id' }
+					],
+					external_emails: '',
+					scope: 'invite'
+				});
+			}
+			if (method === 'POST' && path === `/api/meetings/${meetingId}/start`) {
+				return meetingsDb.updateMeetingStatus(meetingId, 'active').then(() => ({
+					id: meetingId,
+					title: 'Start Test Meeting',
+					scheduled_time: Date.now() + 60000,
+					duration_minutes: 30,
+					location_type: 'discord_vc',
+					location_details: '',
+					creator_id: 'user_123',
+					status: 'active',
+					attendees: [
+						{ attendee_type: 'user', discord_id: 'user_invite_id' }
+					],
+					external_emails: '',
+					scope: 'invite'
+				}));
+			}
+			return Promise.reject(new Error(`Unexpected callMotherboard in test: ${method} ${path}`));
+		});
 	});
 
 	test('should deny access to unauthorized users', async () => {
@@ -484,7 +596,11 @@ describe('Slash Command: /meet-stop', () => {
 			},
 			voice: {
 				channelId: 'voice_chan_999'
-			}
+			},
+			user: {
+				bot: false
+			},
+			send: jest.fn().mockResolvedValue(true)
 		};
 
 		mockGuild = {
@@ -493,10 +609,25 @@ describe('Slash Command: /meet-stop', () => {
 				fetch: jest.fn().mockResolvedValue(mockMember),
 			},
 			channels: {
+				fetch: jest.fn().mockImplementation(async (id) => {
+					if (id === '1508037242092912650') {
+						return {
+							id: '1508037242092912650',
+							send: jest.fn().mockResolvedValue(true)
+						};
+					}
+					return null;
+				}),
 				cache: {
-					get: jest.fn().mockReturnValue({
-						delete: jest.fn().mockResolvedValue(true),
-						id: 'voice_chan_999'
+					get: jest.fn().mockImplementation((id) => {
+						if (id === 'voice_chan_999') {
+							return {
+								members: new Map(),
+								id: 'voice_chan_999',
+								delete: jest.fn().mockResolvedValue(true)
+							};
+						}
+						return null;
 					}),
 					find: jest.fn().mockReturnValue({
 						send: jest.fn().mockResolvedValue(true)
@@ -518,6 +649,45 @@ describe('Slash Command: /meet-stop', () => {
 				user: { id: 'bot_id' }
 			}
 		};
+
+		callMotherboard.mockImplementation((method, path, userId, body) => {
+			const meetingId = 'meet_stop_test';
+			if (method === 'GET' && path === `/api/meetings/${meetingId}`) {
+				return Promise.resolve({
+					id: meetingId,
+					title: 'Stop Test Meeting',
+					scheduled_time: Date.now() + 60000,
+					duration_minutes: 30,
+					location_type: 'discord_vc',
+					location_details: '',
+					creator_id: 'user_123',
+					status: 'active',
+					attendees: [
+						{ attendee_type: 'user', discord_id: 'user_invite_id' }
+					],
+					external_emails: '',
+					scope: 'invite'
+				});
+			}
+			if (method === 'POST' && path === `/api/meetings/${meetingId}/stop`) {
+				return meetingsDb.updateMeetingStatus(meetingId, 'completed').then(() => ({
+					id: meetingId,
+					title: 'Stop Test Meeting',
+					scheduled_time: Date.now() + 60000,
+					duration_minutes: 30,
+					location_type: 'discord_vc',
+					location_details: '',
+					creator_id: 'user_123',
+					status: 'completed',
+					attendees: [
+						{ attendee_type: 'user', discord_id: 'user_invite_id' }
+					],
+					external_emails: '',
+					scope: 'invite'
+				}));
+			}
+			return Promise.reject(new Error(`Unexpected callMotherboard in test: ${method} ${path}`));
+		});
 	});
 
 	test('should deny access to unauthorized users', async () => {

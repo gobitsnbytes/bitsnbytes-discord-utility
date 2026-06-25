@@ -2,12 +2,6 @@
  * Unit tests for commands/forks-info.js
  */
 
-const { execute, handleButton } = require('../commands/forks-info');
-const notion = require('../lib/notion');
-const auth = require('../lib/auth');
-const db = require('../lib/db');
-const { MessageFlags } = require('discord.js');
-
 // Mock notion
 jest.mock('../lib/notion', () => ({
 	getForks: jest.fn(),
@@ -26,6 +20,12 @@ jest.mock('../lib/db', () => ({
 	run: jest.fn().mockResolvedValue(true),
 	get: jest.fn(),
 }));
+
+const { execute, handleButton } = require('../commands/forks-info');
+const notion = require('../lib/notion');
+const auth = require('../lib/auth');
+const db = require('../lib/db');
+const { MessageFlags } = require('discord.js');
 
 describe('Forks Info Command Tests', () => {
 	let mockInteraction;

@@ -2,10 +2,6 @@
  * Unit tests for lib/channelSync.js
  */
 
-const { syncForkPermissions } = require('../lib/channelSync');
-const notion = require('../lib/notion');
-const { ChannelType, PermissionFlagsBits } = require('discord.js');
-
 // Mock notion module
 jest.mock('../lib/notion', () => ({
 	getCityName: jest.fn(),
@@ -19,6 +15,10 @@ jest.mock('../lib/logger', () => ({
 	warn: jest.fn(),
 	error: jest.fn(),
 }));
+
+const { syncForkPermissions } = require('../lib/channelSync');
+const notion = require('../lib/notion');
+const { ChannelType, PermissionFlagsBits } = require('discord.js');
 
 describe('Channel Permissions Sync Tests', () => {
 	let mockClient;

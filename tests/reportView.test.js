@@ -2,10 +2,10 @@
  * Unit tests for commands/report-view.js
  */
 
-const { execute } = require('../commands/report-view');
-const notion = require('../lib/notion');
-const auth = require('../lib/auth');
-const { MessageFlags } = require('discord.js');
+// Clean cache
+delete require.cache[require.resolve('../config')];
+delete require.cache[require.resolve('../lib/notion')];
+delete require.cache[require.resolve('../lib/auth')];
 
 // Mock notion
 jest.mock('../lib/notion', () => ({
@@ -17,6 +17,11 @@ jest.mock('../lib/notion', () => ({
 jest.mock('../lib/auth', () => ({
 	isAuthorizedForCity: jest.fn(),
 }));
+
+const { execute } = require('../commands/report-view');
+const notion = require('../lib/notion');
+const auth = require('../lib/auth');
+const { MessageFlags } = require('discord.js');
 
 describe('Report View Command Tests', () => {
 	let mockInteraction;

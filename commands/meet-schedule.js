@@ -145,8 +145,6 @@ module.exports = {
 				? externalEmailsStr.split(',').map(e => e.trim().toLowerCase()).filter(e => e.includes('@'))
 				: [];
 
-			// Generate a unique ID
-			const id = `meet_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 			const guild = interaction.guild;
 
 			const inviteesDisplay = [];
@@ -167,106 +165,58 @@ module.exports = {
 				});
 			}
 
-			// Push booking to Cal.com using duration-based event type routing
-			// (matches the same logic used by the web booking portal)
-			let calcomBookingId = null;
-			if (process.env.CALCOM_API_KEY) {
-				try {
-					const d = parseInt(duration, 10);
-					const calcomEventTypeId = d <= 15
-						? process.env.CALCOM_EVENT_TYPE_15
-						: d <= 30
-							? process.env.CALCOM_EVENT_TYPE_30
-							: process.env.CALCOM_EVENT_TYPE_45;
-
-					if (calcomEventTypeId) {
-						const calcom = require('../lib/calcom');
-						const creatorEmail = await meetingsDb.getUserEmail(interaction.user.id) || process.env.SMTP_USER || 'hello@gobitsnbytes.org';
-						const meetingNotes = [notes, description].filter(Boolean).join('\n\n');
-
-						const bookingBody = {
-							eventTypeId: parseInt(calcomEventTypeId, 10),
-							start: new Date(scheduledTime).toISOString(),
-							metadata: { discord_meeting_id: id },
-							attendee: {
-								name: interaction.user.username,
-								email: creatorEmail,
-								timeZone: 'Asia/Kolkata',
-								language: 'en'
-							},
-							...(externalEmails.length > 0 && { guests: externalEmails }),
-							...(meetingNotes && {
-								bookingFieldsResponses: { notes: meetingNotes }
-							})
-						};
-
-						const bookingResponse = await calcom.createBooking(bookingBody);
-						if (bookingResponse && (bookingResponse.uid || bookingResponse.id)) {
-							calcomBookingId = String(bookingResponse.uid || bookingResponse.id);
-							console.log(`[MEET_SCHEDULE] Cal.com booking created: ${calcomBookingId} (${duration}min)`);
-						}
-					}
-				} catch (calcomErr) {
-					console.warn('[MEET_SCHEDULE] Cal.com sync failed (non-fatal):', calcomErr.message);
-				}
-			}
-
-			const timeDiff = scheduledTime - Date.now();
-			const isInstant = timeDiff <= 5 * 60 * 1000;
-			
-			let initialStatus = 'scheduled';
-			if (isInstant) {
-				initialStatus = locationType === 'discord_vc' ? 'active' : 'completed';
-			}
-
-			// Create the meeting record
-			await meetingsDb.createMeeting({
-				id,
+			// Call Motherboard API to schedule meeting
+			const { callMotherboard } = require('../lib/motherboardApi');
+			const response = await callMotherboard('POST', '/api/meetings/schedule', interaction.user.id, {
 				title,
 				description,
-				scheduledTime,
-				locationType,
-				locationDetails,
-				creatorId: interaction.user.id,
-				status: initialStatus,
-				calcomBookingId,
-				endTime,
-				externalEmails,
+				scheduled_time: scheduledTime,
+				duration_minutes: duration,
+				location_type: locationType,
+				location_details: locationDetails,
+				creator_id: interaction.user.id,
+				invitees: attendeesToAdd,
+				external_emails: externalEmails,
+				notes,
 				scope
 			});
 
-			for (const att of attendeesToAdd) {
-				await meetingsDb.addAttendee(id, att.type, att.id);
-			}
+			// Normalize response
+			const createdMeeting = {
+				...response,
+				scheduled_time: response.scheduled_time,
+				attendees: (response.attendees || []).map(a => ({
+					type: a.attendee_type,
+					discordId: a.discord_id
+				})),
+				externalEmails: response.external_emails ? response.external_emails.split(',') : []
+			};
+
+			const timeDiff = scheduledTime - Date.now();
+			const isInstant = timeDiff <= 5 * 60 * 1000;
 
 			let vcLink = '';
-			
+
 			// Provision Voice Channel immediately for ALL voice meetings
-			const createdMeeting = await meetingsDb.getMeeting(id);
-			if (createdMeeting && calcomBookingId) {
-				try {
-					const calcom = require('../lib/calcom');
-					const locationUrl = `https://cal.gobitsnbytes.org/m/${createdMeeting.meet_code}`;
-					await calcom.updateBookingLocation(calcomBookingId, locationUrl);
-					console.log(`[MEET_SCHEDULE] Updated booking ${calcomBookingId} location to ${locationUrl}`);
-				} catch (patchErr) {
-					console.warn(`[MEET_SCHEDULE] Failed to patch booking location:`, patchErr.message);
-				}
-			}
 			if (createdMeeting && locationType === 'discord_vc') {
 				const vcChannel = await createMeetingVoiceChannel(guild, createdMeeting);
 				if (vcChannel) {
 					createdMeeting.temp_channel_id = vcChannel.id;
 					vcLink = `https://discord.com/channels/${guild.id}/${vcChannel.id}`;
+
+					// Update temp_channel_id on Motherboard
+					await callMotherboard('PATCH', `/api/meetings/${createdMeeting.id}`, interaction.user.id, {
+						temp_channel_id: vcChannel.id
+					});
 				}
 			}
-			
+
 			// If scheduled within 5 minutes (or instantly), send DMs immediately
 			if (isInstant && createdMeeting) {
 				// Send DM notification to attendees immediately
 				await sendMeetingDMs(guild, createdMeeting, vcLink);
 				// Record that the 5-minute reminder has been sent so the scheduler doesn't run it again
-				await meetingsDb.recordReminderSent(id, '5m');
+				await meetingsDb.recordReminderSent(createdMeeting.id, '5m');
 			}
 
 			const istTimeString = new Date(scheduledTime).toLocaleString('en-US', {
@@ -313,9 +263,6 @@ module.exports = {
 			if (notes) {
 				embed.addFields({ name: '🗒️ MEETING NOTES', value: notes, inline: false });
 			}
-			if (calcomBookingId) {
-				embed.addFields({ name: '📆 GOOGLE CALENDAR', value: `Synced → [cal.com/bitsnbytes](https://cal.com/bitsnbytes)`, inline: false });
-			}
 
 			// Post the confirmation in the events channel
 			const { getEventsChannel } = require('../lib/calcomWebhook');
@@ -332,13 +279,6 @@ module.exports = {
 				content: `✅ Meeting successfully scheduled! Confirmation sent to channel.`,
 				embeds: [embed]
 			});
-
-			// Send email invitations to attendees
-			const createdMeetingForEmail = await meetingsDb.getMeeting(id);
-			if (createdMeetingForEmail) {
-				await sendMeetingEmails(guild, createdMeetingForEmail, 'invite');
-			}
-
 		} catch (error) {
 			console.error('[MEET_SCHEDULE_ERROR]', error);
 			await interaction.editReply({

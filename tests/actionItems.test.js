@@ -5,24 +5,33 @@ const path = require('path');
 const dbPath = require('../lib/db').dbPath;
 const db = new sqlite3.Database(dbPath);
 
-jest.mock('../config', () => ({
-	COLORS: {
-		primary: '#97192c',
-		secondary: '#120f0a',
-		success: '#23a55a',
-		warning: '#ffae24',
-		error: '#f04438',
-		neutral: '#ff7a1b',
-	},
-	EMOJIS: {
-		success: '🟢',
-		error: '🔴',
-	},
-	BRANDING: {
-		footerText: 'TEST_FOOTER',
-	},
-	PRIVACY: {}
-}));
+jest.mock('../config', () => {
+	const original = jest.requireActual('../config');
+	return {
+		...original,
+		COLORS: {
+			...original.COLORS,
+			primary: '#97192c',
+			secondary: '#120f0a',
+			success: '#23a55a',
+			warning: '#ffae24',
+			error: '#f04438',
+			neutral: '#ff7a1b',
+		},
+		EMOJIS: {
+			...original.EMOJIS,
+			success: '🟢',
+			error: '🔴',
+		},
+		BRANDING: {
+			...original.BRANDING,
+			footerText: 'TEST_FOOTER',
+		},
+		PRIVACY: {
+			...original.PRIVACY
+		}
+	};
+});
 
 describe('Action Items Database and Interaction Tests', () => {
 	const testMeetingId = 'meet_action_item_test_123';

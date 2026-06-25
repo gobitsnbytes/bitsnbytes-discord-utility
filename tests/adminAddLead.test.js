@@ -1,12 +1,3 @@
-const meetingsDb = require('../lib/meetingsDb');
-const { execute } = require('../commands/admin-add-lead');
-const { ChannelType } = require('discord.js');
-const notion = require('../lib/notion');
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-const dbPath = require('../lib/db').dbPath;
-const db = new sqlite3.Database(dbPath);
-
 // Mock notion
 jest.mock('../lib/notion', () => ({
 	findForkByCity: jest.fn(),
@@ -16,22 +7,39 @@ jest.mock('../lib/notion', () => ({
 }));
 
 // Mock config
-jest.mock('../config', () => ({
-	COLORS: {
-		success: '#00FF95',
-		error: '#FF0055',
-	},
-	EMOJIS: {
-		protocol: '⚛️',
-		error: '❌',
-	},
-	BRANDING: {
-		footerText: 'TEST_FOOTER',
-	},
-	PRIVACY: {
-		merge: true,
-	},
-}));
+jest.mock('../config', () => {
+	const original = jest.requireActual('../config');
+	return {
+		...original,
+		COLORS: {
+			...original.COLORS,
+			success: '#00FF95',
+			error: '#FF0055',
+		},
+		EMOJIS: {
+			...original.EMOJIS,
+			protocol: '⚛️',
+			error: '❌',
+		},
+		BRANDING: {
+			...original.BRANDING,
+			footerText: 'TEST_FOOTER',
+		},
+		PRIVACY: {
+			...original.PRIVACY,
+			merge: true,
+		}
+	};
+});
+
+const meetingsDb = require('../lib/meetingsDb');
+const { execute } = require('../commands/admin-add-lead');
+const { ChannelType } = require('discord.js');
+const notion = require('../lib/notion');
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+const dbPath = require('../lib/db').dbPath;
+const db = new sqlite3.Database(dbPath);
 
 describe('Admin Add Lead Database helper tests', () => {
 	const discordId = 'user_direct_123';

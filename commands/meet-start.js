@@ -39,16 +39,38 @@ module.exports = {
 		await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
 		try {
+			const { callMotherboard } = require('../lib/motherboardApi');
 			let meetingId = interaction.options.getString('meeting-id');
 			let meeting = null;
 
 			if (meetingId) {
-				meeting = await meetingsDb.getMeeting(meetingId);
+				const response = await callMotherboard('GET', `/api/meetings/${meetingId}`, interaction.user.id);
+				if (response) {
+					meeting = {
+						...response,
+						scheduled_time: response.scheduled_time,
+						attendees: (response.attendees || []).map(a => ({
+							type: a.attendee_type,
+							discordId: a.discord_id
+						}))
+					};
+				}
 			} else {
 				// Try to find the meeting by the voice channel the user is currently in
 				const voiceChannelId = member.voice.channelId;
 				if (voiceChannelId) {
-					meeting = await meetingsDb.findMeetingByTempChannel(voiceChannelId);
+					const meetings = await callMotherboard('GET', '/api/meetings', interaction.user.id);
+					const matched = meetings.find(m => m.temp_channel_id === voiceChannelId);
+					if (matched) {
+						meeting = {
+							...matched,
+							scheduled_time: matched.scheduled_time,
+							attendees: (matched.attendees || []).map(a => ({
+								type: a.attendee_type,
+								discordId: a.discord_id
+							}))
+						};
+					}
 				}
 			}
 
@@ -64,10 +86,17 @@ module.exports = {
 				});
 			}
 
-			// Update status to active
+			// Update status to active on Motherboard
 			if (meeting.status !== 'active') {
-				await meetingsDb.updateMeetingStatus(meeting.id, 'active');
-				meeting.status = 'active';
+				const response = await callMotherboard('POST', `/api/meetings/${meeting.id}/start`, interaction.user.id);
+				meeting = {
+					...response,
+					scheduled_time: response.scheduled_time,
+					attendees: (response.attendees || []).map(a => ({
+						type: a.attendee_type,
+						discordId: a.discord_id
+					}))
+				};
 			}
 
 			// Send commencement notification to events channel
@@ -137,27 +166,17 @@ module.exports = {
 
 	async autocomplete(interaction) {
 		try {
-			// Suggest upcoming/scheduled/pending meetings
-			const db = require('../lib/db');
-			// We can query all meetings in 'scheduled' or 'pending' status
-			const meetings = await new Promise((resolve, reject) => {
-				db.all(
-					`SELECT id, title, scheduled_time FROM meetings WHERE status IN ('scheduled', 'pending') ORDER BY scheduled_time ASC LIMIT 25`,
-					[],
-					(err, rows) => {
-						if (err) reject(err);
-						else resolve(rows || []);
-					}
-				);
-			});
-
-			const choices = meetings.map(m => {
-				const timeStr = new Date(m.scheduled_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-				return {
-					name: `${m.title.substring(0, 50)} (${timeStr})`,
-					value: m.id
-				};
-			});
+			const { callMotherboard } = require('../lib/motherboardApi');
+			const meetings = await callMotherboard('GET', '/api/meetings', 'discord_bot');
+			const choices = meetings
+				.filter(m => m.status === 'scheduled' || m.status === 'pending')
+				.map(m => {
+					const timeStr = new Date(m.scheduled_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+					return {
+						name: `${m.title.substring(0, 50)} (${timeStr})`,
+						value: m.id
+					};
+				});
 
 			const focusedValue = interaction.options.getFocused() || '';
 			const filtered = choices.filter(choice => 
