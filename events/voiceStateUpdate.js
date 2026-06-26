@@ -22,22 +22,30 @@ module.exports = {
 
 				const meeting = await meetingsDb.findMeetingByTempChannel(newChannelId);
 				if (meeting) {
+					// Resolve the voice channel robustly to handle caching race conditions
+					let voiceChannel = newState.channel;
+					if (!voiceChannel) {
+						voiceChannel = await newState.guild.channels.fetch(newChannelId).catch(() => null);
+					}
+
+					if (!voiceChannel) {
+						console.warn(`[MEETING] Could not resolve voice channel ${newChannelId} for meeting ${meeting.id}`);
+						return;
+					}
+
 					// 1. Handle auto-commencement when 2+ humans are present
 					if (meeting.status === 'scheduled' || meeting.status === 'pending') {
-						const newChannel = newState.channel;
-						if (newChannel) {
-							const humanMembers = newChannel.members.filter(m => !m.user.bot);
-							if (humanMembers.size >= 2) {
-								// Transition status to active atomically
-								if (await meetingsDb.tryClaimReminder(meeting.id, 'commencement')) {
-									await meetingsDb.updateMeetingStatus(meeting.id, 'active');
-									meeting.status = 'active';
+						const humanMembers = voiceChannel.members.filter(m => !m.user.bot);
+						if (humanMembers.size >= 2) {
+							// Transition status to active atomically
+							if (await meetingsDb.tryClaimReminder(meeting.id, 'commencement')) {
+								await meetingsDb.updateMeetingStatus(meeting.id, 'active');
+								meeting.status = 'active';
 
-									// Send commencement notification
-									const { sendCommencementNotification } = require('../lib/meetingsHelper');
-									await sendCommencementNotification(newState.guild, meeting);
-									console.log(`[MEETING] Meeting "${meeting.title}" (${meeting.id}) auto-commenced because 2+ human users joined the VC.`);
-								}
+								// Send commencement notification
+								const { sendCommencementNotification } = require('../lib/meetingsHelper');
+								await sendCommencementNotification(newState.guild, meeting);
+								console.log(`[MEETING] Meeting "${meeting.title}" (${meeting.id}) auto-commenced because 2+ human users joined the VC.`);
 							}
 						}
 					}
@@ -47,7 +55,7 @@ module.exports = {
 						const { isRecording, startRecording, handleUserJoin } = require('../lib/voiceRecorder');
 						if (!isRecording(meeting.id)) {
 							console.log(`[MEETING] Starting recording on-demand for active meeting "${meeting.title}" (${meeting.id}) because human joined.`);
-							await startRecording(newState.channel, meeting.id, newState.client).catch(err => {
+							await startRecording(voiceChannel, meeting.id, newState.client).catch(err => {
 								console.error(`[MEETING] Failed to start recording on-demand:`, err.message);
 							});
 						} else if (!newState.member?.user?.bot) {
