@@ -247,6 +247,7 @@ module.exports = {
 				.setDescription(embedDescription)
 				.addFields(
 					{ name: '📋 TITLE', value: title, inline: false },
+					{ name: '🆔 MEETING ID', value: `\`${createdMeeting.id}\``, inline: false },
 					{ name: '📅 SCHEDULED TIME (IST)', value: `\`${istTimeString}\` (<t:${Math.floor(scheduledTime / 1000)}:F> / <t:${Math.floor(scheduledTime / 1000)}:R>)`, inline: false },
 					{ name: '⏱️ DURATION', value: `${duration} minutes`, inline: true },
 					{ name: '🌐 LOCATION', value: locationType === 'discord_vc' ? 'Discord Temporary VC' : 'External Location', inline: true },
