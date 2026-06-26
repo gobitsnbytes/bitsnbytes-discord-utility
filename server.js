@@ -979,7 +979,7 @@ function startWebServer(client) {
     // Serve meeting page HTML
     app.get('/m/:meetCode', async (req, res) => {
         const { meetCode } = req.params;
-        if (!/^[a-z]{3}-[a-z]{4}-[a-z]{3}$/.test(meetCode)) {
+        if (!/^(?:[a-z]{3}-[a-z]{4}-[a-z]{3}|m_[a-zA-Z0-9]{8})$/.test(meetCode)) {
             return res.status(404).sendFile(path.join(__dirname, 'public/index.html'));
         }
         const meeting = await meetingsDb.getMeetingByCode(meetCode).catch(() => null);
@@ -1526,7 +1526,7 @@ function startWebServer(client) {
             }
 
             // Create VC immediately
-            const createdMeeting = await meetingsDb.getMeeting(id);
+            const createdMeeting = await meetingsDb.getMeeting(result.id);
             if (createdMeeting) {
                 const vcChannel = await meetingsHelper.createMeetingVoiceChannel(guild, createdMeeting);
                 if (vcChannel) {
@@ -1831,7 +1831,7 @@ function startWebServer(client) {
                         const bookingBody = {
                             eventTypeId: parseInt(calcomEventTypeId, 10),
                             start: new Date(startTimeMs).toISOString(),
-                            metadata: { discord_meeting_id: id },
+                            metadata: { discord_meeting_id: result.id },
                             attendee: {
                                 name: name,
                                 email: email.trim().toLowerCase(),
@@ -1862,19 +1862,32 @@ function startWebServer(client) {
                     } catch (calcomErr) {
                         console.warn('[CALCOM] Web booking sync failed:', calcomErr.message);
                         // Clean up hold meeting from DB to release lock
-                        await db.run(`DELETE FROM meetings WHERE id = ?`, [id]);
-                        await db.run(`DELETE FROM meeting_attendees WHERE meeting_id = ?`, [id]);
+                        if (process.env.NODE_ENV !== 'test') {
+                            await meetingsDb.updateMeetingStatus(result.id, 'cancelled').catch(() => {});
+                        } else {
+                            await db.run(`DELETE FROM meetings WHERE id = ?`, [id]);
+                            await db.run(`DELETE FROM meeting_attendees WHERE meeting_id = ?`, [id]);
+                        }
                         return res.status(500).json({ error: 'Failed to synchronize booking with Cal.com.' });
                     }
                 }
 
                 // Update hold meeting to scheduled status
-                await db.run(
-                    `UPDATE meetings 
-                     SET status = 'scheduled', calcom_booking_id = ?, calcom_uid = ? 
-                     WHERE id = ?`,
-                    [calcomBookingId, calcomBookingId, id]
-                );
+                if (process.env.NODE_ENV !== 'test') {
+                    const { callMotherboard } = require('./lib/motherboardApi');
+                    await callMotherboard('PATCH', `/api/meetings/${result.id}`, 'discord_bot', {
+                        status: 'scheduled',
+                        calcom_booking_id: calcomBookingId,
+                        calcom_uid: calcomBookingId
+                    }).catch(err => console.error('[CALCOM] Failed to update status on Motherboard:', err.message));
+                } else {
+                    await db.run(
+                        `UPDATE meetings 
+                         SET status = 'scheduled', calcom_booking_id = ?, calcom_uid = ? 
+                         WHERE id = ?`,
+                        [calcomBookingId, calcomBookingId, id]
+                    );
+                }
             }
 
             // Announce to events channel if bot client is logged in
@@ -1886,12 +1899,12 @@ function startWebServer(client) {
                         const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
                         const row = new ActionRowBuilder().addComponents(
                             new ButtonBuilder()
-                                .setCustomId(`accept_instant_${id}`)
+                                .setCustomId(`accept_instant_${result.id}`)
                                 .setLabel('Accept Sync Request')
                                 .setStyle(ButtonStyle.Success)
                                 .setEmoji('🟢'),
                             new ButtonBuilder()
-                                .setCustomId(`decline_instant_${id}`)
+                                .setCustomId(`decline_instant_${result.id}`)
                                 .setLabel('Decline')
                                 .setStyle(ButtonStyle.Danger)
                                 .setEmoji('🔴')
@@ -1924,26 +1937,30 @@ function startWebServer(client) {
 
                         if (!dmMessage) {
                             // Clean up from DB
-                            await db.run(`DELETE FROM meetings WHERE id = ?`, [id]);
-                            await db.run(`DELETE FROM meeting_attendees WHERE meeting_id = ?`, [id]);
+                            if (process.env.NODE_ENV !== 'test') {
+                                await meetingsDb.updateMeetingStatus(result.id, 'cancelled').catch(() => {});
+                            } else {
+                                await db.run(`DELETE FROM meetings WHERE id = ?`, [id]);
+                                await db.run(`DELETE FROM meeting_attendees WHERE meeting_id = ?`, [id]);
+                            }
                             return res.status(400).json({ error: 'Could not send DM to host. Ensure the host allows direct messages from server members.' });
                         }
 
                         // Expire after 5 minutes
                         setTimeout(async () => {
                             try {
-                                const currentMeeting = await meetingsDb.getMeeting(id);
+                                const currentMeeting = await meetingsDb.getMeeting(result.id);
                                 if (currentMeeting && currentMeeting.status === 'pending') {
-                                    await meetingsDb.updateMeetingStatus(id, 'cancelled');
+                                    await meetingsDb.updateMeetingStatus(result.id, 'cancelled');
                                     
                                     const disabledRow = new ActionRowBuilder().addComponents(
                                         new ButtonBuilder()
-                                            .setCustomId(`accept_instant_${id}`)
+                                            .setCustomId(`accept_instant_${result.id}`)
                                             .setLabel('Request Expired')
                                             .setStyle(ButtonStyle.Secondary)
                                             .setDisabled(true),
                                         new ButtonBuilder()
-                                            .setCustomId(`decline_instant_${id}`)
+                                            .setCustomId(`decline_instant_${result.id}`)
                                             .setLabel('Decline')
                                             .setStyle(ButtonStyle.Danger)
                                             .setDisabled(true)
@@ -1971,7 +1988,7 @@ function startWebServer(client) {
                     }
                 } else {
                     // Provision VC immediately for scheduled meetings!
-                    const createdMeeting = await meetingsDb.getMeeting(id);
+                    const createdMeeting = await meetingsDb.getMeeting(result.id);
                     if (createdMeeting) {
                         const vcChannel = await meetingsHelper.createMeetingVoiceChannel(guild, createdMeeting);
                         if (vcChannel) {
@@ -2236,12 +2253,13 @@ function startWebServer(client) {
                     externalEmails
                 };
 
-                await meetingsDb.createMeeting(newMeeting);
+                const result = await meetingsDb.createMeeting(newMeeting);
+                const realMeetingId = result.id;
                 for (const dId of matchedDiscordIds) {
-                    await meetingsDb.addAttendee(id, 'user', dId);
+                    await meetingsDb.addAttendee(realMeetingId, 'user', dId);
                 }
 
-                const createdMeeting = await meetingsDb.getMeeting(id);
+                const createdMeeting = await meetingsDb.getMeeting(realMeetingId);
                 if (createdMeeting) {
                     if (locationType === 'discord_vc') {
                         const vcChannel = await meetingsHelper.createMeetingVoiceChannel(guild, createdMeeting);

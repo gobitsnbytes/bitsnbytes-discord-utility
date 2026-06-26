@@ -122,6 +122,7 @@ module.exports = {
 						if (vcChannel) {
 							meeting.temp_channel_id = vcChannel.id;
 							vcLink = `https://discord.com/channels/${guild.id}/${vcChannel.id}`;
+							await meetingsDb.setTempChannelId(meetingId, vcChannel.id);
 						}
 					}
 
