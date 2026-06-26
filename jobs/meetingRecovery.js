@@ -61,6 +61,7 @@ async function runRecovery(client) {
 				} else {
 					logger.warn(`[RECOVERY] No metadata.json found for stale meeting ${meetingId}. Marking as failed.`);
 					await meetingsDb.updateRecordingStatus(meetingId, 'failed').catch(() => {});
+					await meetingsDb.updateMeetingStatus(meetingId, 'completed').catch(() => {});
 					// Also clean up any orphan directory
 					if (fs.existsSync(meetingDir)) {
 						fs.rmSync(meetingDir, { recursive: true, force: true });
@@ -73,7 +74,7 @@ async function runRecovery(client) {
 	}
 }
 
-module.exports = (client) => {
+const boot = (client) => {
 	// Schedule to run every 3 hours
 	cron.schedule('0 */3 * * *', async () => {
 		await runRecovery(client);
@@ -85,3 +86,6 @@ module.exports = (client) => {
 		await runRecovery(client);
 	}, 10000); // Wait 10 seconds after boot to let client fully stabilize
 };
+
+module.exports = boot;
+module.exports.runRecovery = runRecovery;
