@@ -729,3 +729,128 @@ describe('Slash Command: /meet-stop', () => {
 		expect(retrieved.status).toBe('completed');
 	});
 });
+
+describe('Meeting Recovery Job Tests', () => {
+	const meetingRecovery = require('../jobs/meetingRecovery');
+
+	test('should mark meeting as completed when metadata.json is missing', async () => {
+		const meetingId = 'meet_stale_no_metadata';
+		// Create an active meeting that is scheduled 4 hours ago
+		const scheduledTime = Date.now() - 4 * 60 * 60 * 1000;
+		
+		await meetingsDb.createMeeting({
+			id: meetingId,
+			title: 'Stale VC Meeting',
+			scheduledTime: scheduledTime,
+			locationType: 'discord_vc',
+			creatorId: 'user_123',
+			status: 'active'
+		});
+
+		// Set temp_channel_id so it matches active VC meeting structure
+		await meetingsDb.setTempChannelId(meetingId, 'voice_chan_stale');
+
+		// Force created_at to be in the past to make it stale
+		const db = require('../lib/db');
+		await db.run(`UPDATE meetings SET created_at = ? WHERE id = ?`, [scheduledTime, meetingId]);
+
+		const mockGuild = {
+			id: 'guild_123',
+			channels: {
+				fetch: jest.fn().mockRejectedValue(new Error('Channel not found'))
+			}
+		};
+
+		const mockClient = {
+			guilds: {
+				fetch: jest.fn().mockResolvedValue(mockGuild)
+			}
+		};
+
+		process.env.GUILD_ID = 'guild_123';
+
+		// Trigger recovery function directly
+		await meetingRecovery.runRecovery(mockClient);
+
+		// Assert that meeting is marked as completed (since metadata.json doesn't exist for it)
+		const retrieved = await meetingsDb.getMeeting(meetingId);
+		expect(retrieved.status).toBe('completed');
+
+		// Also check that it's marked as failed in recording status
+		const row = await require('../lib/db').get(`SELECT recording_status FROM meetings WHERE id = ?`, [meetingId]);
+		expect(row.recording_status).toBe('failed');
+	});
+});
+
+describe('Cal.com Sync Rescheduling Tests', () => {
+	const calcomWebhook = require('../lib/calcomWebhook');
+	const calcom = require('../lib/calcom');
+
+	test('syncCalcomBookings should reschedule meeting in DB and delete sent reminders when start time changes', async () => {
+		const calcomBookingId = 'calcom_booking_resched_123';
+		const meetingId = `meet_cal_${calcomBookingId}`;
+		const oldStartTime = Date.now() + 2 * 60 * 60 * 1000; // 2 hours in future
+		const newStartTime = Date.now() + 4 * 60 * 60 * 1000; // 4 hours in future
+
+		// Create meeting
+		await meetingsDb.createMeeting({
+			id: meetingId,
+			title: 'Cal.com Sync Meeting',
+			scheduledTime: oldStartTime,
+			locationType: 'discord_vc',
+			creatorId: 'user_123',
+			status: 'scheduled',
+			calcomBookingId
+		});
+
+		// Mock a sent reminder
+		await meetingsDb.recordReminderSent(meetingId, '12h');
+		let reminderSent = await meetingsDb.hasReminderBeenSent(meetingId, '12h');
+		expect(reminderSent).toBe(true);
+
+		// Mock calcom getUpcomingBookings
+		jest.spyOn(calcom, 'getUpcomingBookings').mockResolvedValue([{
+			id: calcomBookingId,
+			title: 'Cal.com Sync Meeting',
+			startTime: new Date(newStartTime).toISOString(),
+			endTime: new Date(newStartTime + 30 * 60 * 1000).toISOString(),
+			status: 'accepted',
+			location: 'Discord VC'
+		}]);
+
+		// Mock events channel fetching/announcement to not crash
+		const mockTextChannel = {
+			send: jest.fn().mockResolvedValue(true)
+		};
+		const mockGuild = {
+			id: 'guild_123',
+			channels: {
+				fetch: jest.fn().mockResolvedValue(mockTextChannel),
+				cache: {
+					find: jest.fn().mockReturnValue(mockTextChannel)
+				}
+			}
+		};
+		const mockClient = {
+			guilds: {
+				cache: {
+					first: jest.fn().mockReturnValue(mockGuild)
+				}
+			}
+		};
+
+		// Run sync
+		await calcomWebhook.syncCalcomBookings(mockClient);
+
+		// Verify database was updated
+		const retrieved = await meetingsDb.getMeeting(meetingId);
+		expect(retrieved.scheduled_time).toBe(newStartTime);
+		expect(retrieved.status).toBe('scheduled');
+
+		// Verify reminders were cleared
+		reminderSent = await meetingsDb.hasReminderBeenSent(meetingId, '12h');
+		expect(reminderSent).toBe(false);
+
+		jest.restoreAllMocks();
+	});
+});
