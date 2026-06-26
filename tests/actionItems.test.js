@@ -1,3 +1,4 @@
+const config = require('../config');
 const meetingsDb = require('../lib/meetingsDb');
 const interactionCreate = require('../events/interactionCreate');
 const sqlite3 = require('sqlite3').verbose();
@@ -5,32 +6,34 @@ const path = require('path');
 const dbPath = require('../lib/db').dbPath;
 const db = new sqlite3.Database(dbPath);
 
-jest.mock('../config', () => {
-	const original = jest.requireActual('../config');
-	return {
-		...original,
-		COLORS: {
-			...original.COLORS,
-			primary: '#97192c',
-			secondary: '#120f0a',
-			success: '#23a55a',
-			warning: '#ffae24',
-			error: '#f04438',
-			neutral: '#ff7a1b',
-		},
-		EMOJIS: {
-			...original.EMOJIS,
-			success: '🟢',
-			error: '🔴',
-		},
-		BRANDING: {
-			...original.BRANDING,
-			footerText: 'TEST_FOOTER',
-		},
-		PRIVACY: {
-			...original.PRIVACY
-		}
-	};
+let originalColors, originalEmojis, originalBranding;
+
+beforeAll(() => {
+	originalColors = { ...config.COLORS };
+	originalEmojis = { ...config.EMOJIS };
+	originalBranding = { ...config.BRANDING };
+
+	Object.assign(config.COLORS, {
+		primary: '#97192c',
+		secondary: '#120f0a',
+		success: '#23a55a',
+		warning: '#ffae24',
+		error: '#f04438',
+		neutral: '#ff7a1b',
+	});
+
+	Object.assign(config.EMOJIS, {
+		success: '🟢',
+		error: '🔴',
+	});
+
+	config.BRANDING.footerText = 'TEST_FOOTER';
+});
+
+afterAll(() => {
+	Object.assign(config.COLORS, originalColors);
+	Object.assign(config.EMOJIS, originalEmojis);
+	Object.assign(config.BRANDING, originalBranding);
 });
 
 describe('Action Items Database and Interaction Tests', () => {

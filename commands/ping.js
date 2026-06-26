@@ -50,7 +50,7 @@ module.exports = {
 		// 1. Test Database
 		const dbStart = Date.now();
 		try {
-			const dbType = db.useTurso ? 'Turso Cloud' : 'Local SQLite';
+			const dbType = db.usePostgres ? 'PostgreSQL' : (db.useTurso ? 'Turso Cloud' : 'Local SQLite');
 			await db.get('SELECT 1 as val');
 			results.db.status = '🟢 Connected';
 			results.db.details = `Active (${dbType})`;

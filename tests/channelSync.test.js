@@ -2,22 +2,9 @@
  * Unit tests for lib/channelSync.js
  */
 
-// Mock notion module
-jest.mock('../lib/notion', () => ({
-	getCityName: jest.fn(),
-	getLeadDiscordId: jest.fn(),
-	getTeamMembers: jest.fn(),
-}));
-
-// Mock logger to avoid cluttering test outputs
-jest.mock('../lib/logger', () => ({
-	info: jest.fn(),
-	warn: jest.fn(),
-	error: jest.fn(),
-}));
-
-const { syncForkPermissions } = require('../lib/channelSync');
 const notion = require('../lib/notion');
+const logger = require('../lib/logger');
+const { syncForkPermissions } = require('../lib/channelSync');
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
 
 describe('Channel Permissions Sync Tests', () => {
@@ -29,8 +16,21 @@ describe('Channel Permissions Sync Tests', () => {
 	let mockStaffRole;
 	let mockChannel;
 
+	afterAll(() => {
+		jest.restoreAllMocks();
+	});
+
 	beforeEach(() => {
 		jest.clearAllMocks();
+
+		jest.spyOn(notion, 'getCityName').mockImplementation(() => {});
+		jest.spyOn(notion, 'getLeadDiscordId').mockImplementation(() => {});
+		jest.spyOn(notion, 'getTeamMembers').mockImplementation(() => {});
+		jest.spyOn(notion, 'getForks').mockImplementation(() => {});
+
+		jest.spyOn(logger, 'info').mockImplementation(() => {});
+		jest.spyOn(logger, 'warn').mockImplementation(() => {});
+		jest.spyOn(logger, 'error').mockImplementation(() => {});
 
 		mockFork = { id: 'fork_delhi_page_id' };
 		notion.getCityName.mockReturnValue('Delhi');

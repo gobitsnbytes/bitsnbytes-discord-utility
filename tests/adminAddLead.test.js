@@ -1,43 +1,42 @@
-// Mock notion
-jest.mock('../lib/notion', () => ({
-	findForkByCity: jest.fn(),
-	updateForkStatus: jest.fn(),
-	getLeadDiscordId: jest.fn().mockImplementation(fork => fork?.properties?.['Discord ID']?.rich_text?.[0]?.text?.content || null),
-	getCityName: jest.fn().mockImplementation(fork => fork?.properties?.['What city are you in?']?.rich_text?.[0]?.text?.content || fork?.properties?.City?.rich_text?.[0]?.text?.content || null),
-}));
+const config = require('../config');
 
-// Mock config
-jest.mock('../config', () => {
-	const original = jest.requireActual('../config');
-	return {
-		...original,
-		COLORS: {
-			...original.COLORS,
-			success: '#00FF95',
-			error: '#FF0055',
-		},
-		EMOJIS: {
-			...original.EMOJIS,
-			protocol: '⚛️',
-			error: '❌',
-		},
-		BRANDING: {
-			...original.BRANDING,
-			footerText: 'TEST_FOOTER',
-		},
-		PRIVACY: {
-			...original.PRIVACY,
-			merge: true,
-		}
-	};
-});
+const notion = require('../lib/notion');
 
 const meetingsDb = require('../lib/meetingsDb');
 const { execute } = require('../commands/admin-add-lead');
 const { ChannelType } = require('discord.js');
-const notion = require('../lib/notion');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+
+let originalColors, originalEmojis, originalBranding, originalMergePrivacy;
+
+beforeAll(() => {
+	originalColors = { ...config.COLORS };
+	originalEmojis = { ...config.EMOJIS };
+	originalBranding = { ...config.BRANDING };
+	originalMergePrivacy = config.PRIVACY.merge;
+
+	Object.assign(config.COLORS, {
+		success: '#00FF95',
+		error: '#FF0055',
+	});
+
+	Object.assign(config.EMOJIS, {
+		protocol: '⚛️',
+		error: '❌',
+	});
+
+	config.BRANDING.footerText = 'TEST_FOOTER';
+	config.PRIVACY.merge = true;
+});
+
+afterAll(() => {
+	Object.assign(config.COLORS, originalColors);
+	Object.assign(config.EMOJIS, originalEmojis);
+	Object.assign(config.BRANDING, originalBranding);
+	config.PRIVACY.merge = originalMergePrivacy;
+	jest.restoreAllMocks();
+});
 const dbPath = require('../lib/db').dbPath;
 const db = new sqlite3.Database(dbPath);
 
@@ -95,6 +94,11 @@ describe('Slash Command: /admin-add-lead Authorization', () => {
 
 	beforeEach(() => {
 		jest.clearAllMocks();
+
+		jest.spyOn(notion, 'findForkByCity').mockImplementation(() => {});
+		jest.spyOn(notion, 'updateForkStatus').mockImplementation(() => {});
+		jest.spyOn(notion, 'getLeadDiscordId').mockImplementation(fork => fork?.properties?.['Discord ID']?.rich_text?.[0]?.text?.content || null);
+		jest.spyOn(notion, 'getCityName').mockImplementation(fork => fork?.properties?.['What city are you in?']?.rich_text?.[0]?.text?.content || fork?.properties?.City?.rich_text?.[0]?.text?.content || null);
 
 		mockMember = {
 			roles: {

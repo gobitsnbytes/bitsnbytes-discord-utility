@@ -2,23 +2,8 @@
  * Unit tests for lib/auth.js
  */
 
-// Mock notion module
-jest.mock('../lib/notion', () => {
-	const pagesRetrieve = jest.fn();
-	return {
-		findForkByCity: jest.fn(),
-		findTeamMember: jest.fn(),
-		getLeadDiscordId: jest.fn().mockImplementation(fork => fork?.properties?.['Discord ID']?.rich_text?.[0]?.text?.content || null),
-		getCityName: jest.fn().mockImplementation(fork => fork?.properties?.['What city are you in?']?.rich_text?.[0]?.text?.content || fork?.properties?.City?.rich_text?.[0]?.text?.content || null),
-		pages: {
-			retrieve: pagesRetrieve,
-		},
-		retrievePage: jest.fn().mockImplementation(async (pageId) => pagesRetrieve({ page_id: pageId })),
-	};
-});
-
-const { isAuthorizedForCity, isAuthorizedForForkId, getCoreAdminRoles, getCoreAdminAndParentRoles } = require('../lib/auth');
 const notion = require('../lib/notion');
+const { isAuthorizedForCity, isAuthorizedForForkId, getCoreAdminRoles, getCoreAdminAndParentRoles } = require('../lib/auth');
 
 describe('Auth Layer Tests', () => {
 	let mockUser;
@@ -30,6 +15,12 @@ describe('Auth Layer Tests', () => {
 
 	beforeEach(() => {
 		jest.clearAllMocks();
+
+		jest.spyOn(notion, 'findForkByCity').mockImplementation(() => {});
+		jest.spyOn(notion, 'findTeamMember').mockImplementation(() => {});
+		jest.spyOn(notion, 'getLeadDiscordId').mockImplementation(fork => fork?.properties?.['Discord ID']?.rich_text?.[0]?.text?.content || null);
+		jest.spyOn(notion, 'getCityName').mockImplementation(fork => fork?.properties?.['What city are you in?']?.rich_text?.[0]?.text?.content || fork?.properties?.City?.rich_text?.[0]?.text?.content || null);
+		jest.spyOn(notion, 'retrievePage').mockImplementation(() => {});
 
 		mockUser = { id: 'user_123' };
 		mockMember = {
@@ -206,7 +197,7 @@ describe('Auth Layer Tests', () => {
 		});
 
 		test('should authorize the fork lead', async () => {
-			notion.pages.retrieve.mockResolvedValue({
+			notion.retrievePage.mockResolvedValue({
 				id: 'fork_delhi',
 				properties: {
 					'Discord ID': {
@@ -218,11 +209,11 @@ describe('Auth Layer Tests', () => {
 			const result = await isAuthorizedForForkId(mockUser, 'fork_delhi', mockGuild);
 			
 			expect(result).toBe(true);
-			expect(notion.pages.retrieve).toHaveBeenCalledWith({ page_id: 'fork_delhi' });
+			expect(notion.retrievePage).toHaveBeenCalledWith('fork_delhi');
 		});
 
 		test('should authorize active team members', async () => {
-			notion.pages.retrieve.mockResolvedValue({
+			notion.retrievePage.mockResolvedValue({
 				id: 'fork_delhi',
 				properties: {
 					'Discord ID': {
@@ -240,7 +231,7 @@ describe('Auth Layer Tests', () => {
 		});
 
 		test('should deny access if unauthorized', async () => {
-			notion.pages.retrieve.mockResolvedValue({
+			notion.retrievePage.mockResolvedValue({
 				id: 'fork_delhi',
 				properties: {
 					'Discord ID': {

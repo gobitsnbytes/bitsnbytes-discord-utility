@@ -1,3 +1,5 @@
+const config = require('../config');
+console.log("CONFIG KEYS AT TOP:", Object.keys(config));
 const meetingsDb = require('../lib/meetingsDb');
 const { execute } = require('../commands/meet-schedule');
 const sqlite3 = require('sqlite3').verbose();
@@ -10,37 +12,39 @@ jest.mock('../lib/motherboardApi', () => ({
 }));
 const { callMotherboard } = require('../lib/motherboardApi');
 
-// Mock config
-jest.mock('../config', () => {
-	const original = jest.requireActual('../config');
-	return {
-		...original,
-		COLORS: {
-			...original.COLORS,
-			primary: '#00F2FF',
-			success: '#00FF95',
-			warning: '#FFCC00',
-			error: '#FF0055',
-		},
-		EMOJIS: {
-			...original.EMOJIS,
-			calendar: '📆',
-			reminder: '🔔',
-			error: '❌',
-		},
-		BRANDING: {
-			...original.BRANDING,
-			footerText: 'TEST_FOOTER',
-		},
-		ROLE_IDS: {
-			...original.ROLE_IDS,
-			contributor: 'contrib_role_123'
-		},
-		PRIVACY: {
-			...original.PRIVACY,
-			'meet-schedule': true
-		}
-	};
+let originalColors, originalEmojis, originalBranding, originalContributorRole, originalSchedulePrivacy;
+
+beforeAll(() => {
+	originalColors = { ...config.COLORS };
+	originalEmojis = { ...config.EMOJIS };
+	originalBranding = { ...config.BRANDING };
+	originalContributorRole = config.ROLE_IDS.contributor;
+	originalSchedulePrivacy = config.PRIVACY['meet-schedule'];
+
+	Object.assign(config.COLORS, {
+		primary: '#00F2FF',
+		success: '#00FF95',
+		warning: '#FFCC00',
+		error: '#FF0055',
+	});
+
+	Object.assign(config.EMOJIS, {
+		calendar: '📆',
+		reminder: '🔔',
+		error: '❌',
+	});
+
+	config.BRANDING.footerText = 'TEST_FOOTER';
+	config.ROLE_IDS.contributor = 'contrib_role_123';
+	config.PRIVACY['meet-schedule'] = true;
+});
+
+afterAll(() => {
+	Object.assign(config.COLORS, originalColors);
+	Object.assign(config.EMOJIS, originalEmojis);
+	Object.assign(config.BRANDING, originalBranding);
+	config.ROLE_IDS.contributor = originalContributorRole;
+	config.PRIVACY['meet-schedule'] = originalSchedulePrivacy;
 });
 
 let originalRecordingEnabled;
@@ -52,7 +56,6 @@ beforeAll(() => {
 afterAll(() => {
 	process.env.RECORDING_ENABLED = originalRecordingEnabled;
 	db.close();
-	require('../lib/db').close();
 	require('../lib/listenerManager').closePool();
 });
 

@@ -1,3 +1,4 @@
+const config = require('../config');
 const meetingsDb = require('../lib/meetingsDb');
 const { VcTextCollector } = require('../lib/vcTextCollector');
 const path = require('path');
@@ -6,40 +7,42 @@ const sqlite3 = require('sqlite3').verbose();
 const dbPath = require('../lib/db').dbPath;
 const db = new sqlite3.Database(dbPath);
 
-// Mock config
-jest.mock('../config', () => {
-	const original = jest.requireActual('../config');
-	return {
-		...original,
-		COLORS: {
-			...original.COLORS,
-			primary: '#97192c',
-			success: '#00FF95',
-			warning: '#FFCC00',
-			error: '#FF0055',
-		},
-		EMOJIS: {
-			...original.EMOJIS,
-			error: '❌',
-		},
-		BRANDING: {
-			...original.BRANDING,
-			footerText: 'TEST_FOOTER',
-		},
-		PRIVACY: {
-			...original.PRIVACY,
-			'meet-transcript': true
-		},
-		RECORDING: {
-			...original.RECORDING,
-			consent: {
-				audioEnglish: './assets/english.mp3',
-				audioHindi: './assets/hindi.mp3',
-				textEnglish: 'Test English Consent',
-				textHindi: 'Test Hindi Consent'
-			}
-		}
-	};
+let originalColors, originalEmojis, originalBranding, originalTranscriptPrivacy, originalConsent;
+
+beforeAll(() => {
+	originalColors = { ...config.COLORS };
+	originalEmojis = { ...config.EMOJIS };
+	originalBranding = { ...config.BRANDING };
+	originalTranscriptPrivacy = config.PRIVACY['meet-transcript'];
+	originalConsent = { ...config.RECORDING.consent };
+
+	Object.assign(config.COLORS, {
+		primary: '#97192c',
+		success: '#00FF95',
+		warning: '#FFCC00',
+		error: '#FF0055',
+	});
+
+	Object.assign(config.EMOJIS, {
+		error: '❌',
+	});
+
+	config.BRANDING.footerText = 'TEST_FOOTER';
+	config.PRIVACY['meet-transcript'] = true;
+	Object.assign(config.RECORDING.consent, {
+		audioEnglish: './assets/english.mp3',
+		audioHindi: './assets/hindi.mp3',
+		textEnglish: 'Test English Consent',
+		textHindi: 'Test Hindi Consent'
+	});
+});
+
+afterAll(() => {
+	Object.assign(config.COLORS, originalColors);
+	Object.assign(config.EMOJIS, originalEmojis);
+	Object.assign(config.BRANDING, originalBranding);
+	config.PRIVACY['meet-transcript'] = originalTranscriptPrivacy;
+	config.RECORDING.consent = originalConsent;
 });
 
 describe('Meeting Transcripts Database Tests', () => {

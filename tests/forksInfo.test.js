@@ -2,29 +2,17 @@
  * Unit tests for commands/forks-info.js
  */
 
-// Mock notion
-jest.mock('../lib/notion', () => ({
-	getForks: jest.fn(),
-	getLeadDiscordId: jest.fn(),
-	getTeamMembers: jest.fn(),
-	limitConcurrency: jest.fn().mockImplementation(async (tasks) => Promise.all(tasks.map(t => t()))),
-}));
-
-// Mock auth
-jest.mock('../lib/auth', () => ({
-	isStaff: jest.fn(),
-}));
-
-// Mock db
-jest.mock('../lib/db', () => ({
-	run: jest.fn().mockResolvedValue(true),
-	get: jest.fn(),
-}));
-
-const { execute, handleButton } = require('../commands/forks-info');
 const notion = require('../lib/notion');
 const auth = require('../lib/auth');
 const db = require('../lib/db');
+
+// Set up spy mocks
+jest.spyOn(auth, 'isStaff').mockImplementation(() => {});
+
+jest.spyOn(db, 'run').mockResolvedValue(true);
+jest.spyOn(db, 'get').mockImplementation(() => {});
+
+const { execute, handleButton } = require('../commands/forks-info');
 const { MessageFlags } = require('discord.js');
 
 describe('Forks Info Command Tests', () => {
@@ -33,8 +21,17 @@ describe('Forks Info Command Tests', () => {
 	let mockChannel;
 	let mockMessage;
 
+	afterAll(() => {
+		jest.restoreAllMocks();
+	});
+
 	beforeEach(() => {
 		jest.clearAllMocks();
+
+		jest.spyOn(notion, 'getForks').mockImplementation(() => {});
+		jest.spyOn(notion, 'getLeadDiscordId').mockImplementation(() => {});
+		jest.spyOn(notion, 'getTeamMembers').mockImplementation(() => {});
+		jest.spyOn(notion, 'limitConcurrency').mockImplementation(async (tasks) => Promise.all(tasks.map(t => t())));
 
 		mockMessage = {
 			id: 'existing_msg_999',
