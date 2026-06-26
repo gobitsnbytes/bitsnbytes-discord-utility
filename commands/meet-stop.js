@@ -43,7 +43,7 @@ module.exports = {
 			let meeting = null;
 
 			if (meetingId) {
-				const response = await callMotherboard('GET', `/api/meetings/${meetingId}`, interaction.user.id);
+				const response = await callMotherboard('GET', `/api/meetings/${meetingId}`, 'discord_bot');
 				if (response) {
 					meeting = {
 						...response,
@@ -58,7 +58,7 @@ module.exports = {
 				// Try to find the meeting by the voice channel the user is currently in
 				const voiceChannelId = member.voice.channelId;
 				if (voiceChannelId) {
-					const meetings = await callMotherboard('GET', '/api/meetings', interaction.user.id);
+					const meetings = await callMotherboard('GET', '/api/meetings', 'discord_bot');
 					const matched = meetings.find(m => m.temp_channel_id === voiceChannelId);
 					if (matched) {
 						meeting = {
@@ -121,7 +121,7 @@ module.exports = {
 			}
 
 			// 3. Mark meeting as completed on Motherboard
-			await callMotherboard('POST', `/api/meetings/${meeting.id}/stop`, interaction.user.id);
+			await callMotherboard('POST', `/api/meetings/${meeting.id}/stop`, 'discord_bot');
 
 			let successMessage = `✅ Meeting "**${meeting.title}**" has been stopped successfully.`;
 			if (hasRecording) {

@@ -167,7 +167,7 @@ module.exports = {
 
 			// Call Motherboard API to schedule meeting
 			const { callMotherboard } = require('../lib/motherboardApi');
-			const response = await callMotherboard('POST', '/api/meetings/schedule', interaction.user.id, {
+			const response = await callMotherboard('POST', '/api/meetings/schedule', 'discord_bot', {
 				title,
 				description,
 				scheduled_time: scheduledTime,
@@ -205,7 +205,7 @@ module.exports = {
 					vcLink = `https://discord.com/channels/${guild.id}/${vcChannel.id}`;
 
 					// Update temp_channel_id on Motherboard
-					await callMotherboard('PATCH', `/api/meetings/${createdMeeting.id}`, interaction.user.id, {
+					await callMotherboard('PATCH', `/api/meetings/${createdMeeting.id}`, 'discord_bot', {
 						temp_channel_id: vcChannel.id
 					});
 				}
