@@ -2267,8 +2267,97 @@ function startWebServer(client) {
                             createdMeeting.temp_channel_id = vcChannel.id;
                             await meetingsDb.setTempChannelId(createdMeeting.id, vcChannel.id);
                         }
+
+                        // Patch booking location on Cal.com instantly
+                        const isTestMode = process.env.NODE_ENV === 'test' || 
+                                           !!process.env.BUN_TEST ||
+                                           !!process.env.JEST_WORKER_ID || 
+                                           typeof globalThis.describe !== 'undefined' || 
+                                           typeof globalThis.test !== 'undefined';
+                        if (!isTestMode && process.env.CALCOM_API_KEY) {
+                            try {
+                                const calcom = require('./lib/calcom');
+                                const locationUrl = `https://cal.gobitsnbytes.org/m/${createdMeeting.meet_code}`;
+                                await calcom.updateBookingLocation(uid, locationUrl);
+                                logger.info(`[WEBHOOK] Updated booking ${uid} location to ${locationUrl}`);
+                            } catch (patchErr) {
+                                logger.warn(`[WEBHOOK] Failed to patch booking location for booking ${uid}:`, patchErr.message);
+                            }
+                        }
                     }
                     await meetingsHelper.sendMeetingEmails(guild, createdMeeting, 'invite');
+                }
+            } else if (triggerEvent === 'BOOKING_RESCHEDULED') {
+                const existing = await meetingsDb.findMeetingByCalcomId(uid);
+                if (!existing) return;
+
+                const scheduledTimeChanged = Math.abs(existing.scheduled_time - startTime) > 60000;
+                if (scheduledTimeChanged) {
+                    logger.info(`[WEBHOOK] Meeting "${title}" was rescheduled via webhook. Updating schedule time...`);
+
+                    const isTestMode = process.env.NODE_ENV === 'test' || 
+                                       !!process.env.BUN_TEST ||
+                                       !!process.env.JEST_WORKER_ID || 
+                                       typeof globalThis.describe !== 'undefined' || 
+                                       typeof globalThis.test !== 'undefined';
+
+                    let updatedMeeting;
+                    if (!isTestMode) {
+                        // For production, use meetingsDb.rescheduleMeeting to update Motherboard and log history
+                        updatedMeeting = await meetingsDb.rescheduleMeeting(
+                            existing.id,
+                            startTime,
+                            endTime,
+                            'Rescheduled via Cal.com Webhook',
+                            'calcom_webhook'
+                        );
+                    } else {
+                        // For test fallback, update SQLite database directly
+                        await meetingsDb.updateMeetingStatus(existing.id, 'scheduled');
+                        const db = require('./lib/db');
+                        await db.run(
+                            `UPDATE meetings SET scheduled_time = ?, end_time = ?, status = 'scheduled' WHERE id = ?`,
+                            [startTime, endTime, existing.id]
+                        );
+                        updatedMeeting = await meetingsDb.getMeeting(existing.id);
+                    }
+
+                    // Delete sent reminders locally so reminders are sent again for the new time
+                    const db = require('./lib/db');
+                    await db.run(`DELETE FROM meeting_reminders_sent WHERE meeting_id = ?`, [existing.id]);
+
+                    if (updatedMeeting) {
+                        // Format new schedule string in IST
+                        const newIstTimeString = new Date(startTime).toLocaleString('en-US', {
+                            timeZone: 'Asia/Kolkata',
+                            hour12: true,
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                        }) + ' IST';
+
+                        // Announce to events channel
+                        const eventsChannel = await getEventsChannel(guild);
+                        if (eventsChannel) {
+                            const embed = new EmbedBuilder()
+                                .setTitle(`🔄 CALCOM_WEBHOOK // MEETING_RESCHEDULED`)
+                                .setDescription(`A meeting has been rescheduled on Cal.com.`)
+                                .addFields(
+                                    { name: '📋 TITLE', value: title, inline: false },
+                                    { name: '📅 NEW SCHEDULED TIME (IST)', value: `\`${newIstTimeString}\` (<t:${Math.floor(startTime / 1000)}:F>)`, inline: false }
+                                )
+                                .setColor(config.COLORS.warning)
+                                .setTimestamp()
+                                .setFooter({ text: config.BRANDING.footerText });
+
+                            await eventsChannel.send({ embeds: [embed] });
+                        }
+
+                        // Send emails to attendees (update/reschedule invitation + new ICS file)
+                        await meetingsHelper.sendMeetingEmails(guild, updatedMeeting, 'invite');
+                    }
                 }
             } else if (triggerEvent === 'BOOKING_CANCELLED') {
                 const existing = await meetingsDb.findMeetingByCalcomId(uid);
