@@ -44,17 +44,7 @@ module.exports = {
 			let meeting = null;
 
 			if (meetingId) {
-				const response = await callMotherboard('GET', `/api/meetings/${meetingId}`, 'discord_bot');
-				if (response) {
-					meeting = {
-						...response,
-						scheduled_time: response.scheduled_time,
-						attendees: (response.attendees || []).map(a => ({
-							type: a.attendee_type,
-							discordId: a.discord_id
-						}))
-					};
-				}
+				meeting = await meetingsDb.getMeeting(meetingId);
 			} else {
 				// Try to find the meeting by the voice channel the user is currently in
 				const voiceChannelId = member.voice.channelId;
@@ -153,7 +143,7 @@ module.exports = {
 			}
 
 			await interaction.editReply({
-				content: `✅ Meeting "**${meeting.title}**" started successfully. Notified ${pingCount} missing attendees.`
+				content: `✅ Meeting "**${meeting.title}**" (ID: \`${meeting.id}\`) started successfully. Notified ${pingCount} missing attendees.`
 			});
 
 		} catch (error) {
