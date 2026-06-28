@@ -718,6 +718,29 @@ function startWebServer(client) {
                 await meetingsDb.setUserEmail(req.user.id, req.user.email);
             }
 
+            // Sync availability settings to Motherboard (Neon PostgreSQL) so Chrono portal gets live data
+            if (process.env.NODE_ENV !== 'test') {
+                const localRecord = await db.get(`SELECT * FROM user_availability WHERE discord_id = ?`, [req.user.id]);
+                if (localRecord) {
+                    const { callMotherboard } = require('./lib/motherboardApi');
+                    await callMotherboard('POST', '/api/meetings/availability', req.user.id, {
+                        discord_id: localRecord.discord_id,
+                        username: localRecord.username,
+                        email: localRecord.email || null,
+                        timezone: localRecord.timezone || 'Asia/Kolkata',
+                        weekly_hours: localRecord.weekly_hours || null,
+                        booking_link: localRecord.booking_link || null,
+                        title: localRecord.title || null,
+                        description: localRecord.description || null,
+                        calcom_event_type_id: localRecord.calcom_event_type_id || null,
+                        associated_role_id: localRecord.associated_role_id || null,
+                        avatar: localRecord.avatar || null,
+                    }).catch(err => {
+                        console.warn('[AVAILABILITY_SYNC] Motherboard sync failed:', err.message);
+                    });
+                }
+            }
+
             res.json({ success: true });
         } catch (err) {
             console.error('[API_UPDATE_ERROR]', err);
