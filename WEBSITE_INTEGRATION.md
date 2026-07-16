@@ -118,6 +118,38 @@ This guide explains how to integrate the Bits & Bytes Fork Dashboard features wi
 
 ## 🔌 API Integration
 
+### Programmatic Activities API
+The Discord bot exposes a secure, API key-authorized endpoint at `cal.gobitsnbytes.org` specifically for logging activities and allocating points to forks from external systems (like a website, form, or custom webhook).
+
+* **URL:** `https://cal.gobitsnbytes.org/api/v1/activities`
+* **Method:** `POST`
+* **Headers:**
+  - `Content-Type: application/json`
+  - `X-API-Key: <YOUR_API_KEY>` (matches `BOT_API_KEY` or `API_INTERNAL_SECRET` in `.env`)
+* **Request Body:**
+  ```json
+  {
+    "city": "noida",
+    "activity_type": "pulse_submission",
+    "details": "Submitted weekly operational pulse report"
+  }
+  ```
+* **Supported Activity Types & Points:**
+  - `report_submit`: 15 points
+  - `event_completed`: 50 points
+  - `partnership_claimed`: 25 points
+  - `pulse_submission`: 2 points
+* **Response (Success):**
+  ```json
+  {
+    "success": true,
+    "city": "NOIDA",
+    "activity_type": "pulse_submission",
+    "points_awarded": 2,
+    "message": "Successfully logged activity and awarded 2 points to NOIDA fork."
+  }
+  ```
+
 ### Using the Notion SDK
 
 The website should use the official Notion SDK to interact with the databases:
