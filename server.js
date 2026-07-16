@@ -2099,6 +2099,8 @@ function startWebServer(client) {
         const apiKey = req.headers['x-api-key'] || req.query.api_key;
         const expectedKey = process.env.BOT_API_KEY || process.env.API_INTERNAL_SECRET;
 
+        console.log('[API_KEY_DEBUG] apiKey:', JSON.stringify(apiKey), 'expectedKey:', JSON.stringify(expectedKey));
+
         if (!expectedKey) {
             return res.status(500).json({ error: 'System misconfiguration: API key is not configured.' });
         }
