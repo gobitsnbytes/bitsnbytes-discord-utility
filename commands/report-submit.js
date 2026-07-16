@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, MessageFlags } = require('discord.js');
 const notion = require('../lib/notion');
+const gamification = require('../lib/gamification');
 const config = require('../config');
 const auth = require('../lib/auth');
 
@@ -82,7 +83,7 @@ async function processReportSubmission(user, city, type, notes, attachmentUrl, g
 
 	// Award points for report submission
 	try {
-		await notion.updateForkPoints(fork.id, 5);
+		await notion.updateForkPoints(fork.id, gamification.POINTS.REPORT_SUBMISSION);
 	} catch (e) {
 		// Ignore points update errors
 	}
@@ -116,7 +117,7 @@ async function processReportSubmission(user, city, type, notes, attachmentUrl, g
 
 	embed.addFields({
 		name: 'Points Awarded',
-		value: '5 points added to the fork.',
+		value: `${gamification.POINTS.REPORT_SUBMISSION} points added to the fork.`,
 		inline: false,
 	});
 

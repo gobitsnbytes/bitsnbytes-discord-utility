@@ -103,26 +103,11 @@ module.exports = {
 				console.warn(`[EVENT_CREATE] Failed to check for duplicate events:`, err.message);
 			}
 
-			// Create the event
-			const event = await notion.createEvent({
-				title,
-				forkId: fork.id,
-				date: dateStr,
-				type,
-				description,
-				expectedAttendees,
-				createdBy: interaction.user.id,
-			});
-
-			// Auto-complete Onboarding Step 7 (First event planned)
-			const onboardingStatus = await notion.getOnboardingStatus(fork.id).catch(() => null);
-			if (onboardingStatus && !onboardingStatus.steps.find(s => s.step === 7)?.completed) {
-				await notion.updateOnboardingStep(fork.id, 7, true).catch(() => {});
-				console.log(`[EVENT_CREATE] Automatically marked Onboarding Step 7 complete for ${city}.`);
-			}
+			const eventId = `ev_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
 			// Push to Cal.com -> Google Calendar for visibility
 			let calcomBookingId = null;
+			let calcomUid = null;
 			if (process.env.CALCOM_API_KEY && process.env.CALCOM_EVENT_TYPE_30) {
 				try {
 					const bookingResponse = await calcom.createBooking({
@@ -130,7 +115,7 @@ module.exports = {
 						start: new Date(`${dateStr}T10:00:00+05:30`).toISOString(),
 						timeZone: 'Asia/Kolkata',
 						language: 'en',
-						metadata: { discord_event_id: event?.id || 'unknown', fork_city: city },
+						metadata: { discord_event_id: eventId, fork_city: city },
 						attendee: {
 							name: interaction.user.username,
 							email: process.env.SMTP_USER || 'hello@gobitsnbytes.org',
@@ -140,13 +125,37 @@ module.exports = {
 							notes: `Fork Event: ${title}\nCity: ${city}\nType: ${type}\n\n${description}`.trim()
 						}
 					});
-					if (bookingResponse && (bookingResponse.uid || bookingResponse.id)) {
-						calcomBookingId = String(bookingResponse.uid || bookingResponse.id);
+					if (bookingResponse) {
+						if (bookingResponse.uid) calcomUid = String(bookingResponse.uid);
+						if (bookingResponse.id) calcomBookingId = String(bookingResponse.id);
+						// Fallback: if id is not set but uid is, use uid for both
+						if (!calcomBookingId && calcomUid) calcomBookingId = calcomUid;
 						console.log(`[EVENT_CREATE] Cal.com booking created: ${calcomBookingId} for ${city} fork event`);
 					}
 				} catch (calErr) {
 					console.warn('[EVENT_CREATE] Cal.com sync failed (non-fatal):', calErr.message);
 				}
+			}
+
+			// Create the event
+			const event = await notion.createEvent({
+				id: eventId,
+				title,
+				forkId: fork.id,
+				date: dateStr,
+				type,
+				description,
+				expectedAttendees,
+				createdBy: interaction.user.id,
+				calcomBookingId,
+				calcomUid,
+			});
+
+			// Auto-complete Onboarding Step 7 (First event planned)
+			const onboardingStatus = await notion.getOnboardingStatus(fork.id).catch(() => null);
+			if (onboardingStatus && !onboardingStatus.steps.find(s => s.step === 7)?.completed) {
+				await notion.updateOnboardingStep(fork.id, 7, true).catch(() => {});
+				console.log(`[EVENT_CREATE] Automatically marked Onboarding Step 7 complete for ${city}.`);
 			}
 
 			// Award points for creating event

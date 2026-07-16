@@ -102,15 +102,13 @@ module.exports = {
 		await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
 		try {
-			// Ensure table exists for tracking settings (testing only)
-			if (process.env.NODE_ENV === 'test') {
-				await db.run(`
-					CREATE TABLE IF NOT EXISTS bot_settings (
-						key TEXT PRIMARY KEY,
-						val TEXT
-					)
-				`);
-			}
+			// Ensure table exists for tracking settings (idempotent - safe in all environments)
+			await db.run(`
+				CREATE TABLE IF NOT EXISTS bot_settings (
+					key TEXT PRIMARY KEY,
+					val TEXT
+				)
+			`).catch(() => {}); // Ignore if already exists (PG throws on IF NOT EXISTS race)
 
 			// Query forks
 			const forks = await notion.getForks();

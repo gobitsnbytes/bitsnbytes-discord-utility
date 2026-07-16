@@ -5,6 +5,7 @@ const gamification = require('../lib/gamification');
 const config = require('../config');
 const auth = require('../lib/auth');
 const calcom = require('../lib/calcom');
+const db = require('../lib/db');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -50,8 +51,17 @@ module.exports = {
 			const date = interaction.options.getString('date');
 			const attendees = interaction.options.getInteger('attendees');
 
-			// Get the event to find the forkId
-			const event = await notion.getEvents().then(events => events.find(e => e.id === eventId));
+			// Get the event directly by ID (efficient single-row lookup)
+			const row = await db.get('SELECT * FROM events WHERE id = ?', [eventId]);
+			const event = row ? {
+				id: row.id,
+				forkId: row.fork_id,
+				title: row.title,
+				date: row.date,
+				type: row.type,
+				status: row.status,
+				calcomBookingId: row.calcom_booking_id || null,
+			} : null;
 			if (!event) {
 				return await interaction.editReply({
 					content: `${config.EMOJIS.error} Event not found for ID: ${eventId}`,

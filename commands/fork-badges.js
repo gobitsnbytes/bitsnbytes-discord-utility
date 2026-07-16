@@ -96,12 +96,24 @@ module.exports = {
 					}
 				}
 
+				// Calculate pulse streak from the fork's Notion Last Pulse property
+				let pulseStreak = 0;
+				const lastPulseDate = fork.properties['Last Pulse']?.date?.start;
+				if (lastPulseDate) {
+					const diffDays = Math.floor((new Date() - new Date(lastPulseDate)) / (1000 * 60 * 60 * 24));
+					// Approximate weekly pulses: each 7-day window is one "streak" unit
+					// Use reports as additional pulse signals for a combined streak estimate
+					if (diffDays < 7) pulseStreak = Math.max(1, reports.length);
+					else if (diffDays < 14) pulseStreak = Math.max(1, Math.ceil(reports.length * 0.75));
+					else if (diffDays < 30) pulseStreak = Math.ceil(reports.length * 0.5);
+				}
+
 				const forkData = {
 					health,
 					totalEvents: events.filter(e => e.status === 'Completed').length,
 					teamComplete: teamValidation.isValid,
 					teamMembersAdded: teamMembers.length,
-					pulseStreak: 0,
+					pulseStreak,
 					reportsOnTime: reports.filter(r => r.status === 'on-time').length,
 					partnerships: fork.properties['Partnerships Count']?.number || 0,
 					onboardingComplete: onboardingStatus.progress === 7,
