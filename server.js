@@ -2095,7 +2095,7 @@ function startWebServer(client) {
     }
 
     // Programmatic Activity API - secured by API Key
-    app.post('/api/v1/activities', async (req, res) => {
+    app.post('/api/v1/activities', express.json({ limit: '100kb' }), async (req, res) => {
         const apiKey = req.headers['x-api-key'] || req.query.api_key;
         const expectedKey = process.env.BOT_API_KEY || process.env.API_INTERNAL_SECRET;
 
@@ -2107,7 +2107,20 @@ function startWebServer(client) {
             return res.status(401).json({ error: 'Unauthorized: Invalid API Key.' });
         }
 
-        const { city, activity_type, details } = req.body;
+        let body = req.body;
+        if (typeof body === 'string') {
+            try {
+                body = JSON.parse(body);
+            } catch (e) {
+                return res.status(400).json({ error: 'Bad Request: Invalid JSON body.' });
+            }
+        }
+
+        if (!body) {
+            return res.status(400).json({ error: 'Bad Request: Missing JSON body.' });
+        }
+
+        const { city, activity_type, details } = body;
 
         if (!city || !activity_type) {
             return res.status(400).json({ error: 'Bad Request: Missing required fields (city, activity_type).' });
