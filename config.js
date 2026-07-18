@@ -112,6 +112,7 @@ module.exports = {
 		'meet-start': true,        // Ephemeral - start meeting manually
 		'meet-stop': true,         // Ephemeral - stop meeting manually
 		'meet-reschedule': true,   // Ephemeral - reschedule meeting
+		'meet-cancel': true,       // Ephemeral - cancel meeting
 		'ts-off': true             // Ephemeral - secret emergency recording abort
 	},
 
