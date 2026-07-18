@@ -101,6 +101,22 @@ async function getActiveCities() {
     }
 }
 
+// Helper to resolve a host profile by booking_link slug from Motherboard or SQLite
+async function resolveHostByLink(link) {
+    const isTest = process.env.NODE_ENV === 'test';
+    if (isTest) {
+        return db.get(`SELECT * FROM user_availability WHERE booking_link = ?`, [link]);
+    }
+    const motherboardUrl = process.env.MOTHERBOARD_API_URL || 'http://localhost:8000';
+    try {
+        const mbRes = await fetch(`${motherboardUrl}/api/meetings/public/availability/${encodeURIComponent(link)}`);
+        if (mbRes.ok) return await mbRes.json();
+    } catch (e) {
+        console.warn('[AVAILABILITY_API] Motherboard lookup failed, falling back to SQLite:', e.message);
+    }
+    return db.get(`SELECT * FROM user_availability WHERE booking_link = ?`, [link]);
+}
+
 // Timezone offset helper (DST aware)
 function getTimezoneOffsetString(timeZone, date = new Date()) {
     try {
@@ -931,22 +947,6 @@ function startWebServer(client) {
         }
 
         try {
-            const motherboardUrl = process.env.MOTHERBOARD_API_URL || 'http://localhost:8000';
-
-            // Helper to resolve a host profile by booking_link slug
-            async function resolveHostByLink(link) {
-                if (process.env.NODE_ENV === 'test') {
-                    return db.get(`SELECT * FROM user_availability WHERE booking_link = ?`, [link]);
-                }
-                try {
-                    const mbRes = await fetch(`${motherboardUrl}/api/meetings/public/availability/${encodeURIComponent(link)}`);
-                    if (mbRes.ok) return await mbRes.json();
-                } catch (e) {
-                    console.warn('[AVAILABILITY_API] Motherboard lookup failed, falling back to SQLite:', e.message);
-                }
-                return db.get(`SELECT * FROM user_availability WHERE booking_link = ?`, [link]);
-            }
-
             const primaryHost = await resolveHostByLink(bookingLink);
             if (!primaryHost) {
                 return res.status(404).json({ error: 'Primary host not found' });
@@ -1655,7 +1655,7 @@ function startWebServer(client) {
         const { bookingLink } = req.params;
         try {
             // 1. Check if bookingLink matches a user booking handle
-            const host = await db.get(`SELECT 1 FROM user_availability WHERE booking_link = ?`, [bookingLink]);
+            const host = await resolveHostByLink(bookingLink);
             if (host) {
                 return res.sendFile(path.join(__dirname, 'public/book.html'));
             }
@@ -1711,7 +1711,7 @@ function startWebServer(client) {
         const resolvedScope = validateScope(typeof scope === 'string' ? scope.trim().toLowerCase() : null);
 
         try {
-            const primaryHost = await db.get(`SELECT * FROM user_availability WHERE booking_link = ?`, [bookingLink]);
+            const primaryHost = await resolveHostByLink(bookingLink);
             if (!primaryHost) {
                 return res.status(404).json({ error: 'Primary host not found.' });
             }
@@ -1742,7 +1742,7 @@ function startWebServer(client) {
             
             for (const handle of additionalHandles) {
                 if (!handle.trim() || handle.trim() === bookingLink) continue;
-                const addHost = await db.get(`SELECT * FROM user_availability WHERE booking_link = ?`, [handle.trim()]);
+                const addHost = await resolveHostByLink(handle.trim());
                 if (addHost) {
                     allHosts.push(addHost);
                 }
