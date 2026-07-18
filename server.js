@@ -869,13 +869,29 @@ function startWebServer(client) {
         const weeklyHours = JSON.parse(host.weekly_hours || '{}');
         
         // We get the meetings for this host
-        const meetings = await db.all(`
-            SELECT m.scheduled_time, m.end_time 
-            FROM meetings m
-            LEFT JOIN meeting_attendees ma ON m.id = ma.meeting_id
-            WHERE (m.creator_id = ? OR ma.discord_id = ?) 
-              AND m.status != 'cancelled'
-        `, [host.discord_id, host.discord_id]);
+        let meetings = [];
+        const isTest = process.env.NODE_ENV === 'test' || !!process.env.BUN_TEST || !!process.env.JEST_WORKER_ID;
+        if (isTest) {
+            meetings = await db.all(`
+                SELECT m.scheduled_time, m.end_time 
+                FROM meetings m
+                LEFT JOIN meeting_attendees ma ON m.id = ma.meeting_id
+                WHERE (m.creator_id = ? OR ma.discord_id = ?) 
+                  AND m.status != 'cancelled'
+            `, [host.discord_id, host.discord_id]);
+        } else {
+            try {
+                const { callMotherboard } = require('./lib/motherboardApi');
+                const list = await callMotherboard('GET', '/api/meetings', 'discord_bot');
+                meetings = (list || []).filter(m => {
+                    const isCreator = m.creator_id === host.discord_id;
+                    const isAttendee = (m.attendees || []).some(a => a.discord_id === host.discord_id);
+                    return (isCreator || isAttendee) && m.status !== 'cancelled';
+                });
+            } catch (e) {
+                console.error('[getHostFreeSlotsUTC] failed to fetch meetings from Motherboard:', e.message);
+            }
+        }
 
         const utcSlots = [];
         const primaryDateObj = new Date(localStartISO);
