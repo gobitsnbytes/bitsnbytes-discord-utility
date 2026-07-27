@@ -91,6 +91,7 @@ module.exports = {
 					await handleCloudApproveButton(interaction);
 				} catch (error) {
 					console.error('[BUTTON_ERROR] Cloud approve error:', error);
+					await interaction.reply({ content: `❌ Error: ${error.message}`, ephemeral: true }).catch(() => null);
 				}
 			} else if (interaction.customId === 'cloud_deny') {
 				try {
@@ -98,6 +99,7 @@ module.exports = {
 					await handleCloudDenyButton(interaction);
 				} catch (error) {
 					console.error('[BUTTON_ERROR] Cloud deny error:', error);
+					await interaction.reply({ content: `❌ Error: ${error.message}`, ephemeral: true }).catch(() => null);
 				}
 			} else if (interaction.customId === 'refresh_forks_info') {
 				const command = interaction.client.commands.get('forks-info');
