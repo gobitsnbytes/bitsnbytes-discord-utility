@@ -25,6 +25,6 @@ describe('Cloud Authorization & Anti-Abuse Flow Tests', () => {
 		expect(mockInteraction.reply).toHaveBeenCalledTimes(1);
 		const replyData = mockInteraction.reply.mock.calls[0][0];
 		expect(replyData.components.length).toBe(1);
-		expect(replyData.flags).toBeDefined();
+		expect(replyData.ephemeral).toBe(true);
 	});
 });
